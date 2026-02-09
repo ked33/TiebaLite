@@ -51,30 +51,55 @@ jobs:
           cache-read-only: ${{ github.ref != 'refs/heads/master' && github.ref != 'refs/heads/4.0-dev' }}
 
       - name: Build with Gradle
-        run: ./gradlew assembleRelease
+        run: ./gradlew assembleRelease --stacktrace --info --warning-mode all
 
-      - name: Read Output Metadata
-        id: read_output_metadata
-        uses: juliangruber/read-file-action@v1
-        with:
-          path: ./app/build/outputs/apk/release/output-metadata.json
-          trim: true
+      - name: Parse Output Metadata
+        id: apk_meta
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import sys
+
+          path = "./app/build/outputs/apk/release/output-metadata.json"
+          if not os.path.exists(path):
+              print("output-metadata.json missing", file=sys.stderr)
+              sys.exit(1)
+
+          with open(path, "r", encoding="utf-8") as f:
+              data = json.load(f)
+
+          elements = data.get("elements") or []
+          if not elements:
+              print("output-metadata.json elements empty", file=sys.stderr)
+              sys.exit(1)
+
+          elem = elements[0]
+          version_code = elem.get("versionCode", "")
+          version_name = elem.get("versionName", "")
+
+          out_path = os.environ.get("GITHUB_OUTPUT")
+          if not out_path:
+              print("GITHUB_OUTPUT not set", file=sys.stderr)
+              sys.exit(1)
+
+          with open(out_path, "a", encoding="utf-8") as out:
+              out.write(f"version_code={version_code}\n")
+              out.write(f"version_name={version_name}\n")
+          PY
 
       - name: Upload Release Package
-        env:
-          version_code: ${{ fromJSON(steps.read_output_metadata.outputs.content).elements[0].versionCode }}
-          version_name: ${{ fromJSON(steps.read_output_metadata.outputs.content).elements[0].versionName }}
         uses: actions/upload-artifact@v4
         if: ${{ ! startsWith(github.ref, 'refs/tags/') }}
         with:
-          name: "release-${{ env.version_name }}(${{ env.version_code }})"
+          name: "release-${{ steps.apk_meta.outputs.version_name }}(${{ steps.apk_meta.outputs.version_code }})"
           path: ./app/build/outputs/apk/release
 
       - name: Compute Release Meta
         id: release_meta
         env:
-          version_code: ${{ fromJSON(steps.read_output_metadata.outputs.content).elements[0].versionCode }}
-          version_name: ${{ fromJSON(steps.read_output_metadata.outputs.content).elements[0].versionName }}
+          version_code: ${{ steps.apk_meta.outputs.version_code }}
+          version_name: ${{ steps.apk_meta.outputs.version_name }}
         run: |
           if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
             tag="${GITHUB_REF#refs/tags/}"
