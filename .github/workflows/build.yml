@@ -24,23 +24,24 @@ jobs:
           distribution: "zulu"
           cache: gradle
 
-      - name: Decode Keystore
-        id: decode_keystore
-        if: ${{ secrets.KEYSTORE != '' && vars.RELEASE_KEYSTORE != '' }}
-        uses: timheuer/base64-to-file@v1.2
-        with:
-          fileName: ${{ vars.RELEASE_KEYSTORE }}
-          fileDir: ${{ github.workspace }}
-          encodedString: ${{ secrets.KEYSTORE }}
-
-      - name: Generate keystore.properties
-        if: ${{ secrets.KEYSTORE != '' && secrets.RELEASESTOREPASSWORD != '' && secrets.RELEASEKEYPASSWORD != '' && vars.RELEASE_KEYSTORE != '' && vars.RELEASE_KEY_ALIAS != '' }}
+      - name: Prepare Signing (optional)
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE }}
+          RELEASE_STORE_PASSWORD: ${{ secrets.RELEASESTOREPASSWORD }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASEKEYPASSWORD }}
+          RELEASE_KEYSTORE: ${{ vars.RELEASE_KEYSTORE }}
+          RELEASE_KEY_ALIAS: ${{ vars.RELEASE_KEY_ALIAS }}
         run: |
-          if [ -n "${{ secrets.RELEASEKEYPASSWORD }}" ]; then
-            echo keystore.file="${{ vars.RELEASE_KEYSTORE }}" >> keystore.properties
-            echo keystore.password="${{ secrets.RELEASESTOREPASSWORD }}" >> keystore.properties
-            echo keystore.key.alias="${{ vars.RELEASE_KEY_ALIAS }}" >> keystore.properties
-            echo keystore.key.password="${{ secrets.RELEASEKEYPASSWORD }}" >> keystore.properties
+          if [ -n "$KEYSTORE_B64" ] && [ -n "$RELEASE_STORE_PASSWORD" ] && [ -n "$RELEASE_KEY_PASSWORD" ] && [ -n "$RELEASE_KEYSTORE" ] && [ -n "$RELEASE_KEY_ALIAS" ]; then
+            printf "%s" "$KEYSTORE_B64" | base64 -d > "$RELEASE_KEYSTORE"
+            {
+              echo "keystore.file=$RELEASE_KEYSTORE"
+              echo "keystore.password=$RELEASE_STORE_PASSWORD"
+              echo "keystore.key.alias=$RELEASE_KEY_ALIAS"
+              echo "keystore.key.password=$RELEASE_KEY_PASSWORD"
+            } >> keystore.properties
+          else
+            echo "Signing secrets/vars not fully set. Skip signing setup."
           fi
 
       - name: Setup Gradle
