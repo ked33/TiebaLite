@@ -874,9 +874,9 @@ fun FeedCard(
     onClickUser: (User) -> Unit = {},
     onClickForum: (SimpleForum) -> Unit = {},
     onClickOriginThread: (OriginThreadInfo) -> Unit = {},
-    dislikeAction: @Composable () -> Unit = {},
     showForumInfo: Boolean = true,
     actionsOnTop: Boolean = false,
+    dislikeAction: @Composable () -> Unit = {},
 ) {
     val actionContent: (@Composable ColumnScope.() -> Unit)? = if (actionsOnTop) null else {
         {
