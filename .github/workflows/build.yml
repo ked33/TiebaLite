@@ -10,6 +10,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout
@@ -24,7 +26,7 @@ jobs:
 
       - name: Decode Keystore
         id: decode_keystore
-        if: startsWith(github.ref, 'refs/tags/')
+        if: ${{ secrets.KEYSTORE != '' && vars.RELEASE_KEYSTORE != '' }}
         uses: timheuer/base64-to-file@v1.2
         with:
           fileName: ${{ vars.RELEASE_KEYSTORE }}
@@ -32,7 +34,7 @@ jobs:
           encodedString: ${{ secrets.KEYSTORE }}
 
       - name: Generate keystore.properties
-        if: startsWith(github.ref, 'refs/tags/')
+        if: ${{ secrets.KEYSTORE != '' && secrets.RELEASESTOREPASSWORD != '' && secrets.RELEASEKEYPASSWORD != '' && vars.RELEASE_KEYSTORE != '' && vars.RELEASE_KEY_ALIAS != '' }}
         run: |
           if [ -n "${{ secrets.RELEASEKEYPASSWORD }}" ]; then
             echo keystore.file="${{ vars.RELEASE_KEYSTORE }}" >> keystore.properties
@@ -67,10 +69,32 @@ jobs:
           name: "release-${{ env.version_name }}(${{ env.version_code }})"
           path: ./app/build/outputs/apk/release
 
-      - name: Upload Release Package to public
+      - name: Compute Release Meta
+        id: release_meta
+        env:
+          version_code: ${{ fromJSON(steps.read_output_metadata.outputs.content).elements[0].versionCode }}
+          version_name: ${{ fromJSON(steps.read_output_metadata.outputs.content).elements[0].versionName }}
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            tag="${GITHUB_REF#refs/tags/}"
+            name="release-${version_name}(${version_code})"
+            prerelease="false"
+          else
+            tag="ci-${GITHUB_RUN_ID}"
+            name="ci-${version_name}(${version_code})"
+            prerelease="true"
+          fi
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          echo "name=${name}" >> "$GITHUB_OUTPUT"
+          echo "prerelease=${prerelease}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish Release APK
         uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/')
         with:
+          tag_name: ${{ steps.release_meta.outputs.tag }}
+          name: ${{ steps.release_meta.outputs.name }}
+          prerelease: ${{ steps.release_meta.outputs.prerelease == 'true' }}
+          target_commitish: ${{ github.sha }}
           files: ./app/build/outputs/apk/release/*.apk
 
 #      - name: Upload Mapping

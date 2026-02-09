@@ -69,6 +69,14 @@ android {
         compose = true
         buildConfig = true
     }
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a")
+            isUniversalApk = false
+        }
+    }
     signingConfigs {
         val keystoreFile = keystoreProperties.getProperty("keystore.file", "")
         if (keystoreFile.isNotBlank()) {
