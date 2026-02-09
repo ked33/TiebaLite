@@ -3,6 +3,7 @@ package com.huanchengfly.tieba.post.ui.widgets.compose
 import android.content.pm.ActivityInfo
 import android.util.Log
 import androidx.compose.animation.animateColorAsState
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
@@ -753,6 +754,116 @@ fun ThreadShareBtn(
 }
 
 @Composable
+private fun threadActionText(
+    count: String,
+    @StringRes emptyLabelResId: Int,
+): String {
+    return if (count == "0" || count.isEmpty()) {
+        stringResource(id = emptyLabelResId)
+    } else {
+        count.toLongOrNull()?.getShortNumString() ?: count
+    }
+}
+
+@Composable
+private fun CompactActionBtn(
+    icon: @Composable () -> Unit,
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    color: Color = LocalContentColor.current,
+) {
+    Row(
+        modifier = modifier
+            .debounceClickable(onClick = onClick)
+            .padding(horizontal = 4.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        ProvideContentColor(color = color) {
+            Box(modifier = Modifier.size(16.dp)) {
+                icon()
+            }
+            Text(
+                text = text,
+                style = MaterialTheme.typography.caption,
+                fontSize = 11.sp,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ThreadCompactReplyBtn(
+    replyNum: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    CompactActionBtn(
+        icon = {
+            Icon(
+                imageVector = ImageVector.vectorResource(id = R.drawable.ic_comment_new),
+                contentDescription = stringResource(id = R.string.desc_comment),
+            )
+        },
+        text = threadActionText(replyNum, R.string.title_reply),
+        onClick = onClick,
+        color = ExtendedTheme.colors.textSecondary,
+        modifier = modifier,
+    )
+}
+
+@Composable
+private fun ThreadCompactAgreeBtn(
+    hasAgree: Boolean,
+    agreeNum: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val contentColor =
+        if (hasAgree) ExtendedTheme.colors.primary else ExtendedTheme.colors.textSecondary
+    val animatedColor by animateColorAsState(contentColor, label = "compactAgreeBtnContentColor")
+    CompactActionBtn(
+        icon = {
+            Icon(
+                imageVector = if (hasAgree) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
+                contentDescription = stringResource(id = R.string.desc_like),
+            )
+        },
+        text = threadActionText(agreeNum, R.string.title_agree),
+        onClick = onClick,
+        color = animatedColor,
+        modifier = modifier,
+    )
+}
+
+@Composable
+private fun ThreadCompactActions(
+    replyNum: String,
+    agreeNum: String,
+    hasAgree: Boolean,
+    onReplyClick: () -> Unit,
+    onAgreeClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        ThreadCompactReplyBtn(
+            replyNum = replyNum,
+            onClick = onReplyClick,
+        )
+        ThreadCompactAgreeBtn(
+            hasAgree = hasAgree,
+            agreeNum = agreeNum,
+            onClick = onAgreeClick,
+        )
+    }
+}
+
+@Composable
 @JvmName("FeedCardForThreadInfo")
 fun FeedCard(
     item: ImmutableHolder<ThreadInfo>,
@@ -764,7 +875,33 @@ fun FeedCard(
     onClickForum: (SimpleForum) -> Unit = {},
     onClickOriginThread: (OriginThreadInfo) -> Unit = {},
     dislikeAction: @Composable () -> Unit = {},
+    showForumInfo: Boolean = true,
+    actionsOnTop: Boolean = false,
 ) {
+    val actionContent: (@Composable ColumnScope.() -> Unit)? = if (actionsOnTop) null else {
+        {
+            Row(modifier = Modifier.fillMaxWidth()) {
+                ThreadShareBtn(
+                    shareNum = item.get { shareNum }.toString(),
+                    onClick = {},
+                    modifier = Modifier.weight(1f)
+                )
+
+                ThreadReplyBtn(
+                    replyNum = item.get { replyNum }.toString(),
+                    onClick = { onClickReply(item.get()) },
+                    modifier = Modifier.weight(1f)
+                )
+
+                ThreadAgreeBtn(
+                    hasAgree = item.get { agree?.hasAgree == 1 },
+                    agreeNum = item.get { agreeNum }.toString(),
+                    onClick = { onAgree(item.get()) },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+    }
     Card(
         header = {
             val author = remember(item) { item.getNullableImmutable { author } }
@@ -775,7 +912,19 @@ fun FeedCard(
                     onClick = {
                         onClickUser(it.get())
                     },
-                ) { dislikeAction() }
+                ) {
+                    if (actionsOnTop) {
+                        ThreadCompactActions(
+                            replyNum = item.get { replyNum }.toString(),
+                            agreeNum = item.get { agreeNum }.toString(),
+                            hasAgree = item.get { agree?.hasAgree == 1 },
+                            onReplyClick = { onClickReply(item.get()) },
+                            onAgreeClick = { onAgree(item.get()) },
+                            modifier = Modifier.padding(end = 8.dp)
+                        )
+                    }
+                    dislikeAction()
+                }
             }
         },
         content = {
@@ -806,30 +955,11 @@ fun FeedCard(
                     )
                 }
 
-            ThreadForumInfo(item = item, onClick = onClickForum)
-        },
-        action = {
-            Row(modifier = Modifier.fillMaxWidth()) {
-                ThreadShareBtn(
-                    shareNum = item.get { shareNum }.toString(),
-                    onClick = {},
-                    modifier = Modifier.weight(1f)
-                )
-
-                ThreadReplyBtn(
-                    replyNum = item.get { replyNum }.toString(),
-                    onClick = { onClickReply(item.get()) },
-                    modifier = Modifier.weight(1f)
-                )
-
-                ThreadAgreeBtn(
-                    hasAgree = item.get { agree?.hasAgree == 1 },
-                    agreeNum = item.get { agreeNum }.toString(),
-                    onClick = { onAgree(item.get()) },
-                    modifier = Modifier.weight(1f)
-                )
+            if (showForumInfo) {
+                ThreadForumInfo(item = item, onClick = onClickForum)
             }
         },
+        action = actionContent,
         onClick = { onClick(item.get()) },
         modifier = modifier,
     )

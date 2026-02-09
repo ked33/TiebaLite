@@ -44,6 +44,8 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material.icons.rounded.VerticalAlignTop
 import androidx.compose.material.rememberScaffoldState
 import androidx.compose.runtime.Composable
@@ -78,6 +80,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.fastForEach
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import com.eygraber.compose.placeholder.PlaceholderHighlight
@@ -94,6 +97,7 @@ import com.huanchengfly.tieba.post.arch.onEvent
 import com.huanchengfly.tieba.post.arch.onGlobalEvent
 import com.huanchengfly.tieba.post.arch.pageViewModel
 import com.huanchengfly.tieba.post.dataStore
+import com.huanchengfly.tieba.post.getBoolean
 import com.huanchengfly.tieba.post.getInt
 import com.huanchengfly.tieba.post.models.ForumHistoryExtra
 import com.huanchengfly.tieba.post.models.database.History
@@ -156,6 +160,13 @@ fun getSortType(
     return context.dataStore.getInt("${forumName}_sort_type", defaultSortType)
 }
 
+private fun getHideSpecialThreads(
+    context: Context,
+    forumName: String,
+): Boolean {
+    return context.dataStore.getBoolean("${forumName}_hide_special_threads", false)
+}
+
 suspend fun setSortType(
     context: Context,
     forumName: String,
@@ -163,6 +174,16 @@ suspend fun setSortType(
 ) {
     context.dataStore.edit {
         it[intPreferencesKey("${forumName}_sort_type")] = sortType
+    }
+}
+
+private suspend fun setHideSpecialThreads(
+    context: Context,
+    forumName: String,
+    hide: Boolean,
+) {
+    context.dataStore.edit {
+        it[booleanPreferencesKey("${forumName}_hide_special_threads")] = hide
     }
 }
 
@@ -468,6 +489,9 @@ fun ForumPage(
                 (Sizes.Large + 16.dp * 2).toPx()
             }
         )
+    }
+    var hideSpecialThreads by rememberSaveable(forumName) {
+        mutableStateOf(getHideSpecialThreads(context, forumName))
     }
 
     val isListAtTop by remember {
@@ -838,92 +862,121 @@ fun ForumPage(
                                 letterSpacing = 0.sp
                             )
 
-                            ScrollableTabRow(
-                                selectedTabIndex = currentPage,
-                                indicator = { tabPositions ->
-                                    PagerTabIndicator(
-                                        pagerState = pagerState,
-                                        tabPositions = tabPositions
-                                    )
-                                },
-                                divider = {},
-                                backgroundColor = Color.Transparent,
-                                contentColor = ExtendedTheme.colors.primary,
-                                edgePadding = 0.dp,
-                                modifier = Modifier
-                                    .wrapContentWidth(align = Alignment.Start)
-                                    .align(Alignment.Start)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                var currentSortType by remember {
-                                    mutableIntStateOf(
-                                        getSortType(
-                                            context,
-                                            forumName
-                                        )
-                                    )
-                                }
-                                TabClickMenu(
-                                    selected = currentPage == 0,
-                                    onClick = {
-                                        coroutineScope.launch {
-                                            pagerState.animateScrollToPage(0)
-                                        }
-                                    },
-                                    text = {
-                                        Text(
-                                            text = stringResource(id = R.string.tab_forum_latest),
-                                            style = tabTextStyle
+                                ScrollableTabRow(
+                                    selectedTabIndex = currentPage,
+                                    indicator = { tabPositions ->
+                                        PagerTabIndicator(
+                                            pagerState = pagerState,
+                                            tabPositions = tabPositions
                                         )
                                     },
-                                    menuContent = {
-                                        ListSinglePicker(
-                                            itemTitles = persistentListOf(
-                                                stringResource(id = R.string.title_sort_by_reply),
-                                                stringResource(id = R.string.title_sort_by_send)
-                                            ),
-                                            itemValues = persistentListOf(0, 1),
-                                            selectedPosition = currentSortType,
-                                            onItemSelected = { _, _, value, changed ->
-                                                if (changed) {
-                                                    currentSortType = value
-                                                    coroutineScope.launch {
-                                                        setSortType(context, forumName, value)
-                                                        emitGlobalEvent(
-                                                            ForumThreadListUiEvent.Refresh(
-                                                                currentPage == 1,
-                                                                value
-                                                            )
-                                                        )
-                                                    }
-                                                }
-                                                dismiss()
-                                            }
-                                        )
-                                    },
-                                    selectedContentColor = ExtendedTheme.colors.primary,
-                                    unselectedContentColor = ExtendedTheme.colors.textSecondary
-                                )
-                                Tab(
-                                    selected = currentPage == 1,
-                                    onClick = {
-                                        coroutineScope.launch {
-                                            pagerState.animateScrollToPage(1)
-                                        }
-                                    },
-                                    selectedContentColor = ExtendedTheme.colors.primary,
-                                    unselectedContentColor = ExtendedTheme.colors.textSecondary
+                                    divider = {},
+                                    backgroundColor = Color.Transparent,
+                                    contentColor = ExtendedTheme.colors.primary,
+                                    edgePadding = 0.dp,
+                                    modifier = Modifier.weight(1f)
                                 ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier
-                                            .height(48.dp)
-                                            .padding(horizontal = 16.dp)
-                                    ) {
-                                        Text(
-                                            text = stringResource(id = R.string.tab_forum_good),
-                                            style = tabTextStyle
+                                    var currentSortType by remember {
+                                        mutableIntStateOf(
+                                            getSortType(
+                                                context,
+                                                forumName
+                                            )
                                         )
                                     }
+                                    TabClickMenu(
+                                        selected = currentPage == 0,
+                                        onClick = {
+                                            coroutineScope.launch {
+                                                pagerState.animateScrollToPage(0)
+                                            }
+                                        },
+                                        text = {
+                                            Text(
+                                                text = stringResource(id = R.string.tab_forum_latest),
+                                                style = tabTextStyle
+                                            )
+                                        },
+                                        menuContent = {
+                                            ListSinglePicker(
+                                                itemTitles = persistentListOf(
+                                                    stringResource(id = R.string.title_sort_by_reply),
+                                                    stringResource(id = R.string.title_sort_by_send)
+                                                ),
+                                                itemValues = persistentListOf(0, 1),
+                                                selectedPosition = currentSortType,
+                                                onItemSelected = { _, _, value, changed ->
+                                                    if (changed) {
+                                                        currentSortType = value
+                                                        coroutineScope.launch {
+                                                            setSortType(context, forumName, value)
+                                                            emitGlobalEvent(
+                                                                ForumThreadListUiEvent.Refresh(
+                                                                    currentPage == 1,
+                                                                    value
+                                                                )
+                                                            )
+                                                        }
+                                                    }
+                                                    dismiss()
+                                                }
+                                            )
+                                        },
+                                        selectedContentColor = ExtendedTheme.colors.primary,
+                                        unselectedContentColor = ExtendedTheme.colors.textSecondary
+                                    )
+                                    Tab(
+                                        selected = currentPage == 1,
+                                        onClick = {
+                                            coroutineScope.launch {
+                                                pagerState.animateScrollToPage(1)
+                                            }
+                                        },
+                                        selectedContentColor = ExtendedTheme.colors.primary,
+                                        unselectedContentColor = ExtendedTheme.colors.textSecondary
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier
+                                                .height(48.dp)
+                                                .padding(horizontal = 16.dp)
+                                        ) {
+                                            Text(
+                                                text = stringResource(id = R.string.tab_forum_good),
+                                                style = tabTextStyle
+                                            )
+                                        }
+                                    }
+                                }
+                                IconButton(
+                                    onClick = {
+                                        val nextValue = !hideSpecialThreads
+                                        hideSpecialThreads = nextValue
+                                        coroutineScope.launch {
+                                            setHideSpecialThreads(context, forumName, nextValue)
+                                        }
+                                    },
+                                    modifier = Modifier.padding(end = 8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = if (hideSpecialThreads) {
+                                            Icons.Rounded.Visibility
+                                        } else {
+                                            Icons.Rounded.VisibilityOff
+                                        },
+                                        contentDescription = stringResource(
+                                            id = if (hideSpecialThreads) {
+                                                R.string.desc_show_forum_special_posts
+                                            } else {
+                                                R.string.desc_hide_forum_special_posts
+                                            }
+                                        ),
+                                        tint = ExtendedTheme.colors.textSecondary
+                                    )
                                 }
                             }
 
@@ -939,6 +992,7 @@ fun ForumPage(
                                         forumId = forumInfo!!.get { id },
                                         forumName = forumInfo!!.get { name },
                                         isGood = it == 1,
+                                        hideSpecialThreads = hideSpecialThreads,
                                         lazyListState = if (it == 0) latestListState else goodListState
                                     )
                                 }

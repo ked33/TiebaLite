@@ -169,6 +169,7 @@ private fun ThreadList(
     onItemClicked: (ThreadInfo) -> Unit,
     onItemReplyClicked: (ThreadInfo) -> Unit,
     onAgree: (ThreadInfo) -> Unit,
+    hideSpecialThreads: Boolean = false,
     forumRuleTitle: String? = null,
     onOpenForumRule: (() -> Unit)? = null,
     onOriginThreadClicked: (OriginThreadInfo) -> Unit = {},
@@ -179,13 +180,18 @@ private fun ThreadList(
         WindowWidthSizeClass.Expanded -> 0.5f
         else -> 1f
     }
+    val visibleItems = if (hideSpecialThreads) {
+        items.filter { it.thread.get { isTop } != 1 }
+    } else {
+        items
+    }
     MyLazyColumn(
         state = state,
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier.fillMaxWidth(),
         contentPadding = WindowInsets.navigationBars.asPaddingValues()
     ) {
-        if (!forumRuleTitle.isNullOrEmpty()) {
+        if (!hideSpecialThreads && !forumRuleTitle.isNullOrEmpty()) {
             item(key = "ForumRule") {
                 TopThreadItem(
                     title = forumRuleTitle,
@@ -198,7 +204,7 @@ private fun ThreadList(
             }
         }
         itemsIndexed(
-            items = items,
+            items = visibleItems,
             key = { index, (holder) ->
                 val (item) = holder
                 "${index}_${item.id}"
@@ -235,7 +241,7 @@ private fun ThreadList(
                         )
                     } else {
                         if (index > 0) {
-                            if (items[index - 1].thread.get { isTop } == 1) {
+                            if (visibleItems[index - 1].thread.get { isTop } == 1) {
                                 Spacer(modifier = Modifier.height(8.dp))
                             }
                             VerticalDivider(modifier = Modifier.padding(horizontal = 16.dp))
@@ -246,7 +252,9 @@ private fun ThreadList(
                             onClickReply = onItemReplyClicked,
                             onAgree = onAgree,
                             onClickOriginThread = onOriginThreadClicked,
-                            onClickUser = onUserClicked
+                            onClickUser = onUserClicked,
+                            showForumInfo = false,
+                            actionsOnTop = true,
                         )
                     }
                 }
@@ -261,6 +269,7 @@ fun ForumThreadListPage(
     forumId: Long,
     forumName: String,
     isGood: Boolean = false,
+    hideSpecialThreads: Boolean = false,
     viewModel: ForumThreadListViewModel = if (isGood) pageViewModel<GoodThreadListViewModel>() else pageViewModel<LatestThreadListViewModel>(),
     lazyListState: LazyListState = rememberLazyListState()
 ) {
@@ -414,6 +423,7 @@ fun ForumThreadListPage(
                             )
                         )
                     },
+                    hideSpecialThreads = hideSpecialThreads,
                     forumRuleTitle = forumRuleTitle,
                     onOpenForumRule = {
                         navigator.navigate(ForumRuleDetailPageDestination(forumId))
