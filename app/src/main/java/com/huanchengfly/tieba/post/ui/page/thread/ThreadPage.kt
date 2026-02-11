@@ -36,6 +36,7 @@ import androidx.compose.material.ButtonDefaults
 import androidx.compose.material.CircularProgressIndicator
 import androidx.compose.material.DropdownMenuItem
 import androidx.compose.material.ExperimentalMaterialApi
+import androidx.compose.material.FloatingActionButton
 import androidx.compose.material.Icon
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.ModalBottomSheetLayout
@@ -124,7 +125,6 @@ import com.huanchengfly.tieba.post.ui.common.theme.compose.invertChipBackground
 import com.huanchengfly.tieba.post.ui.common.theme.compose.invertChipContent
 import com.huanchengfly.tieba.post.ui.common.theme.compose.loadMoreIndicator
 import com.huanchengfly.tieba.post.ui.common.theme.compose.pullRefreshIndicator
-import com.huanchengfly.tieba.post.ui.common.theme.compose.threadBottomBar
 import com.huanchengfly.tieba.post.ui.page.LocalNavigator
 import com.huanchengfly.tieba.post.ui.page.ProvideNavigator
 import com.huanchengfly.tieba.post.ui.page.destinations.CopyTextDialogPageDestination
@@ -247,52 +247,11 @@ fun PostAgreeBtn(
 }
 
 @Composable
-private fun BottomBarAgreeBtn(
-    hasAgreed: Boolean,
-    agreeNum: Long,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val color = if (hasAgreed) ExtendedTheme.colors.accent else ExtendedTheme.colors.textSecondary
-    val animatedColor by animateColorAsState(color, label = "agreeBtnColor")
-
-    Button(
-        onClick = onClick,
-        shape = RoundedCornerShape(0),
-        contentPadding = PaddingValues(horizontal = 4.dp),
-        colors = ButtonDefaults.buttonColors(
-            backgroundColor = ExtendedTheme.colors.bottomBar,
-            contentColor = animatedColor
-        ),
-        modifier = modifier
-    ) {
-        Row(
-            modifier = Modifier.align(Alignment.CenterVertically),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = if (hasAgreed) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
-                contentDescription = stringResource(id = R.string.title_agree),
-                tint = animatedColor
-            )
-            if (agreeNum > 0) {
-                Text(
-                    text = agreeNum.getShortNumString(),
-                    style = MaterialTheme.typography.caption,
-                    color = animatedColor,
-                    fontSize = 12.sp
-                )
-            }
-        }
-    }
-}
-
-@Composable
 private fun BottomBarPlaceholder() {
     Row(
         modifier = Modifier
             .height(IntrinsicSize.Min)
-            .background(ExtendedTheme.colors.bottomBar)
+            .background(Color.Transparent)
             // 拦截点击事件
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
@@ -318,21 +277,14 @@ private fun BottomBarPlaceholder() {
             )
         }
 
-        BottomBarAgreeBtn(
-            hasAgreed = false,
-            agreeNum = 1,
+        FloatingActionButton(
             onClick = {},
-            modifier = Modifier.fillMaxHeight()
-        )
-
-        Box(
-            modifier = Modifier.fillMaxHeight(),
-            contentAlignment = Alignment.Center
+            backgroundColor = ExtendedTheme.colors.windowBackground,
+            contentColor = ExtendedTheme.colors.primary,
         ) {
             Icon(
                 imageVector = Icons.Rounded.MoreVert,
                 contentDescription = stringResource(id = R.string.btn_more),
-                tint = ExtendedTheme.colors.textSecondary,
             )
         }
     }
@@ -629,12 +581,6 @@ fun ThreadPage(
     }
     val isCollected = remember(thread) {
         thread?.get { collectStatus != 0 } == true
-    }
-    val hasThreadAgreed = remember(thread) {
-        thread?.get { agree?.hasAgree == 1 } == true
-    }
-    val threadAgreeNum = remember(thread) {
-        thread?.get { agree?.diffAgreeNum } ?: 0L
     }
     val threadTitle = remember(thread) {
         thread?.get { title } ?: ""
@@ -1132,19 +1078,6 @@ fun ThreadPage(
                                 )
                             )
                         },
-                        onAgree = {
-                            val firstPostId =
-                                thread?.get { firstPostId }.takeIf { it != 0L }
-                                    ?: firstPost?.get { id }
-                                    ?: 0L
-                            if (firstPostId != 0L) viewModel.send(
-                                ThreadUiIntent.AgreeThread(
-                                    threadId,
-                                    firstPostId,
-                                    !hasThreadAgreed
-                                )
-                            )
-                        },
                         onClickMore = {
                             if (bottomSheetState.isVisible) {
                                 closeBottomSheet()
@@ -1152,8 +1085,6 @@ fun ThreadPage(
                                 openBottomSheet()
                             }
                         },
-                        hasAgreed = hasThreadAgreed,
-                        agreeNum = threadAgreeNum,
                         modifier = Modifier
                             .clickable(
                                 interactionSource = remember { MutableInteractionSource() },
@@ -1711,14 +1642,11 @@ private fun TopBar(
 private fun BottomBar(
     user: ImmutableHolder<User>,
     onClickReply: () -> Unit,
-    onAgree: () -> Unit,
     onClickMore: () -> Unit,
     modifier: Modifier = Modifier,
-    hasAgreed: Boolean = false,
-    agreeNum: Long = 0,
 ) {
     Column(
-        modifier = Modifier.background(ExtendedTheme.colors.threadBottomBar)
+        modifier = Modifier.background(Color.Transparent)
     ) {
         Row(
             modifier = Modifier
@@ -1760,24 +1688,14 @@ private fun BottomBar(
                 )
             }
 
-            BottomBarAgreeBtn(
-                hasAgreed = hasAgreed,
-                agreeNum = agreeNum,
-                onClick = onAgree,
-                modifier = Modifier.fillMaxHeight()
-            )
-
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .debounceClickable(onClick = onClickMore)
-                    .padding(horizontal = 4.dp),
-                contentAlignment = Alignment.Center
+            FloatingActionButton(
+                onClick = onClickMore,
+                backgroundColor = ExtendedTheme.colors.windowBackground,
+                contentColor = ExtendedTheme.colors.primary,
             ) {
                 Icon(
                     imageVector = Icons.Rounded.MoreVert,
                     contentDescription = stringResource(id = R.string.btn_more),
-                    tint = ExtendedTheme.colors.textSecondary,
                 )
             }
         }

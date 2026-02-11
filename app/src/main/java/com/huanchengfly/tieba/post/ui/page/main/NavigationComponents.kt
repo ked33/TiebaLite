@@ -379,10 +379,14 @@ fun BottomNavigation(
     navigationItems: ImmutableList<NavigationItem>,
     themeColors: ExtendedColors = ExtendedTheme.colors
 ) {
-    Column(modifier = Modifier.navigationBarsPadding()) {
+    Column(
+        modifier = Modifier
+            .navigationBarsPadding()
+            .background(themeColors.windowBackground)
+    ) {
         BottomNavigationDivider(themeColors)
         BottomNavigation(
-            backgroundColor = themeColors.bottomBar,
+            backgroundColor = themeColors.windowBackground,
             elevation = 0.dp,
         ) {
             navigationItems.fastForEachIndexed { index, navigationItem ->
