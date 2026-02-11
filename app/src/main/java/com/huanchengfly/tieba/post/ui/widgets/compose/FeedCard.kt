@@ -710,6 +710,7 @@ fun ThreadAgreeBtn(
     val contentColor =
         if (hasAgree) ExtendedTheme.colors.primary else ExtendedTheme.colors.textSecondary
     val animatedColor by animateColorAsState(contentColor, label = "agreeBtnContentColor")
+    val doubleClickAction = rememberDoubleClickAction(onDoubleClick = onClick)
 
     ActionBtn(
         icon = {
@@ -727,7 +728,8 @@ fun ThreadAgreeBtn(
         },
         modifier = modifier,
         color = animatedColor,
-        onClick = onClick
+        onClick = doubleClickAction,
+        debounceMillis = 0L,
     )
 }
 
@@ -776,10 +778,11 @@ private fun CompactActionBtn(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     color: Color = LocalContentColor.current,
+    debounceMillis: Long = 500L,
 ) {
     Row(
         modifier = modifier
-            .debounceClickable(onClick = onClick)
+            .debounceClickable(delayMillis = debounceMillis, onClick = onClick)
             .padding(horizontal = 4.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -827,6 +830,7 @@ private fun ThreadCompactAgreeBtn(
     val contentColor =
         if (hasAgree) ExtendedTheme.colors.primary else ExtendedTheme.colors.textSecondary
     val animatedColor by animateColorAsState(contentColor, label = "compactAgreeBtnContentColor")
+    val doubleClickAction = rememberDoubleClickAction(onDoubleClick = onClick)
     CompactActionBtn(
         icon = {
             Icon(
@@ -835,9 +839,10 @@ private fun ThreadCompactAgreeBtn(
             )
         },
         text = threadActionText(agreeNum, R.string.title_agree),
-        onClick = onClick,
+        onClick = doubleClickAction,
         color = animatedColor,
         modifier = modifier,
+        debounceMillis = 0L,
     )
 }
 
@@ -1168,9 +1173,10 @@ private fun ActionBtn(
     modifier: Modifier = Modifier,
     color: Color = LocalContentColor.current,
     onClick: (() -> Unit)? = null,
+    debounceMillis: Long = 500L,
 ) {
     val clickableModifier =
-        if (onClick != null) Modifier.debounceClickable(onClick = onClick) else Modifier
+        if (onClick != null) Modifier.debounceClickable(delayMillis = debounceMillis, onClick = onClick) else Modifier
     Row(
         modifier = clickableModifier
             .padding(vertical = 16.dp)

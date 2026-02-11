@@ -101,7 +101,10 @@ open class AppPreferencesUtils private constructor(ctx: Context) {
         defaultValue = "0"
     )
 
-    var darkTheme by DataStoreDelegates.string(key = "dark_theme", defaultValue = "grey_dark")
+    var darkTheme by DataStoreDelegates.string(
+        key = "dark_theme",
+        defaultValue = ThemeUtil.THEME_GREY_DARK
+    )
 
     var doNotUsePhotoPicker by DataStoreDelegates.boolean(defaultValue = false)
 
@@ -114,7 +117,7 @@ open class AppPreferencesUtils private constructor(ctx: Context) {
 
     var fontScale by DataStoreDelegates.float(defaultValue = 1.0f)
 
-    var forumFabFunction by DataStoreDelegates.string(defaultValue = "post")
+    var forumFabFunction by DataStoreDelegates.string(defaultValue = "refresh")
 
     var hideBlockedContent by DataStoreDelegates.boolean(defaultValue = false)
 
@@ -126,9 +129,9 @@ open class AppPreferencesUtils private constructor(ctx: Context) {
 
     var incognitoMode by DataStoreDelegates.boolean(defaultValue = false)
 
-    var hideMedia by DataStoreDelegates.boolean(defaultValue = false)
+    var hideMedia by DataStoreDelegates.boolean(defaultValue = true)
 
-    var hideReply by DataStoreDelegates.boolean(defaultValue = false)
+    var hideReply by DataStoreDelegates.boolean(defaultValue = true)
 
     var homePageScroll by DataStoreDelegates.boolean(defaultValue = false)
 

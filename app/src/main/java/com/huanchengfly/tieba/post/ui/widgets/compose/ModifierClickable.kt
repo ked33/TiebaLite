@@ -62,3 +62,20 @@ fun Modifier.debounceClickable(
         lastClickTime = currentTime
     }
 }
+
+@Composable
+fun rememberDoubleClickAction(
+    delayMillis: Long = 350L,
+    onDoubleClick: () -> Unit,
+): () -> Unit {
+    var lastClickTime by remember { mutableLongStateOf(0L) }
+    return {
+        val currentTime = System.currentTimeMillis()
+        if (currentTime - lastClickTime <= delayMillis) {
+            onDoubleClick()
+            lastClickTime = 0L
+        } else {
+            lastClickTime = currentTime
+        }
+    }
+}

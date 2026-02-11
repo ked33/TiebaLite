@@ -44,6 +44,7 @@ fun Button(
         contentColor = ExtendedTheme.colors.onAccent
     ),
     contentPadding: PaddingValues = ButtonDefaults.ContentPadding,
+    debounceMillis: Long = 500L,
     content: @Composable RowScope.() -> Unit
 ) {
     val contentColor by colors.contentColor(enabled)
@@ -51,6 +52,7 @@ fun Button(
         modifier = Modifier
             .clip(shape)
             .debounceClickable(
+                delayMillis = debounceMillis,
                 onClick = onClick,
                 enabled = enabled,
                 interactionSource = interactionSource,

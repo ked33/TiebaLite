@@ -162,6 +162,7 @@ import com.huanchengfly.tieba.post.ui.widgets.compose.VerticalDivider
 import com.huanchengfly.tieba.post.ui.widgets.compose.VerticalGrid
 import com.huanchengfly.tieba.post.ui.widgets.compose.buildChipInlineContent
 import com.huanchengfly.tieba.post.ui.widgets.compose.debounceClickable
+import com.huanchengfly.tieba.post.ui.widgets.compose.rememberDoubleClickAction
 import com.huanchengfly.tieba.post.ui.widgets.compose.rememberDialogState
 import com.huanchengfly.tieba.post.ui.widgets.compose.rememberMenuState
 import com.huanchengfly.tieba.post.ui.widgets.compose.states.StateScreen
@@ -214,15 +215,17 @@ fun PostAgreeBtn(
         targetValue = if (hasAgreed) ExtendedTheme.colors.accent else ExtendedTheme.colors.textSecondary,
         label = "postAgreeBtnColor"
     )
+    val doubleClickAction = rememberDoubleClickAction(onDoubleClick = onClick)
     Button(
-        onClick = onClick,
+        onClick = doubleClickAction,
         shape = RoundedCornerShape(4.dp),
         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
         colors = ButtonDefaults.buttonColors(
             backgroundColor = ExtendedTheme.colors.background,
             contentColor = animatedColor
         ),
-        modifier = modifier
+        modifier = modifier,
+        debounceMillis = 0L,
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
