@@ -411,6 +411,7 @@ private fun MediaPlaceholder(
     icon: @Composable () -> Unit,
     text: @Composable () -> Unit,
     modifier: Modifier = Modifier,
+    horizontalArrangement: Arrangement.Horizontal = Arrangement.spacedBy(8.dp),
     onClick: (() -> Unit)? = null,
 ) {
     Row(
@@ -422,7 +423,7 @@ private fun MediaPlaceholder(
             ) { onClick?.invoke() }
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        horizontalArrangement = horizontalArrangement
     ) {
         ProvideContentColor(color = ExtendedTheme.colors.onChip) {
             Box(
@@ -529,26 +530,34 @@ private fun ThreadMedia(
                             index = 0
                         )
                     }
-                    MediaPlaceholder(
-                        icon = {
-                            Icon(
-                                imageVector = if (isSinglePhoto) Icons.Rounded.Photo else Icons.Rounded.PhotoLibrary,
-                                contentDescription = stringResource(id = R.string.desc_photo)
-                            )
-                        },
-                        text = {
-                            Text(text = stringResource(id = R.string.btn_open_photos, mediaCount))
-                        },
-                        modifier = Modifier.fillMaxWidth(0.5f),
-                        onClick = {
-                            context.goToActivity<PhotoViewActivity> {
-                                putExtra(
-                                    PhotoViewActivity.EXTRA_PHOTO_VIEW_DATA,
-                                    photoViewData
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        MediaPlaceholder(
+                            icon = {
+                                Icon(
+                                    imageVector = if (isSinglePhoto) Icons.Rounded.Photo else Icons.Rounded.PhotoLibrary,
+                                    contentDescription = stringResource(id = R.string.desc_photo)
                                 )
+                            },
+                            text = {
+                                Text(text = stringResource(id = R.string.btn_open_photos, mediaCount))
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth(0.5f)
+                                .align(Alignment.TopCenter),
+                            horizontalArrangement = Arrangement.spacedBy(
+                                8.dp,
+                                Alignment.CenterHorizontally
+                            ),
+                            onClick = {
+                                context.goToActivity<PhotoViewActivity> {
+                                    putExtra(
+                                        PhotoViewActivity.EXTRA_PHOTO_VIEW_DATA,
+                                        photoViewData
+                                    )
+                                }
                             }
-                        }
-                    )
+                        )
+                    }
                 } else {
                     val showMediaCount = remember(medias) { min(medias.size, 3) }
                     val hasMoreMedia = remember(medias) { medias.size > 3 }

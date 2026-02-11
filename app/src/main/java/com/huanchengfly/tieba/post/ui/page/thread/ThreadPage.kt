@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredHeightIn
 import androidx.compose.foundation.layout.size
@@ -615,6 +616,7 @@ fun ThreadPage(
     }
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
+    val showReplyEntry = user.get { is_login } == 1 && !context.appPreferences.hideReply
     val openBottomSheet = {
         coroutineScope.launch {
             bottomSheetState.show()
@@ -624,6 +626,9 @@ fun ThreadPage(
         coroutineScope.launch {
             bottomSheetState.hide()
         }
+    }
+    LaunchedEffect(threadId) {
+        bottomSheetState.hide()
     }
 
     MyBackHandler(
@@ -1070,31 +1075,54 @@ fun ThreadPage(
                     )
                 },
                 bottomBar = {
-                    BottomBar(
-                        user = user,
-                        onClickReply = {
-                            navigator.navigate(
-                                ReplyPageDestination(
-                                    forumId = curForumId ?: 0,
-                                    forumName = forum?.get { name }.orEmpty(),
-                                    threadId = threadId,
+                    if (showReplyEntry) {
+                        BottomBar(
+                            user = user,
+                            onClickReply = {
+                                navigator.navigate(
+                                    ReplyPageDestination(
+                                        forumId = curForumId ?: 0,
+                                        forumName = forum?.get { name }.orEmpty(),
+                                        threadId = threadId,
+                                    )
                                 )
+                            },
+                            onClickMore = {
+                                if (bottomSheetState.isVisible) {
+                                    closeBottomSheet()
+                                } else {
+                                    openBottomSheet()
+                                }
+                            },
+                            modifier = Modifier
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null,
+                                    onClick = {}
+                                )
+                        )
+                    }
+                },
+                floatingActionButton = {
+                    if (!showReplyEntry) {
+                        FloatingActionButton(
+                            onClick = {
+                                if (bottomSheetState.isVisible) {
+                                    closeBottomSheet()
+                                } else {
+                                    openBottomSheet()
+                                }
+                            },
+                            backgroundColor = ExtendedTheme.colors.windowBackground,
+                            contentColor = ExtendedTheme.colors.primary,
+                            modifier = Modifier.navigationBarsPadding()
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.MoreVert,
+                                contentDescription = stringResource(id = R.string.btn_more),
                             )
-                        },
-                        onClickMore = {
-                            if (bottomSheetState.isVisible) {
-                                closeBottomSheet()
-                            } else {
-                                openBottomSheet()
-                            }
-                        },
-                        modifier = Modifier
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                                onClick = {}
-                            )
-                    )
+                        }
+                    }
                 },
             ) { paddingValues ->
                 ModalBottomSheetLayout(
@@ -1659,35 +1687,27 @@ private fun BottomBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            if (user.get { is_login } == 1 && !LocalContext.current.appPreferences.hideReply) {
-                Avatar(
-                    data = StringUtil.getAvatarUrl(user.get { portrait }),
-                    size = Sizes.Tiny,
-                    contentDescription = user.get { name },
-                    modifier = Modifier
-                        .padding(vertical = 8.dp)
-                )
+            Avatar(
+                data = StringUtil.getAvatarUrl(user.get { portrait }),
+                size = Sizes.Tiny,
+                contentDescription = user.get { name },
+                modifier = Modifier
+                    .padding(vertical = 8.dp)
+            )
 
-                Row(
-                    modifier = Modifier
-                        .padding(vertical = 8.dp)
-                        .weight(1f)
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(ExtendedTheme.colors.bottomBarSurface)
-                        .debounceClickable(onClick = onClickReply)
-                        .padding(8.dp),
-                ) {
-                    Text(
-                        text = stringResource(id = R.string.tip_reply_thread),
-                        style = MaterialTheme.typography.caption,
-                        color = ExtendedTheme.colors.onBottomBarSurface,
-                    )
-                }
-            } else {
-                Spacer(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(40.dp)
+            Row(
+                modifier = Modifier
+                    .padding(vertical = 8.dp)
+                    .weight(1f)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(ExtendedTheme.colors.bottomBarSurface)
+                    .debounceClickable(onClick = onClickReply)
+                    .padding(8.dp),
+            ) {
+                Text(
+                    text = stringResource(id = R.string.tip_reply_thread),
+                    style = MaterialTheme.typography.caption,
+                    color = ExtendedTheme.colors.onBottomBarSurface,
                 )
             }
 

@@ -54,6 +54,7 @@ import com.huanchengfly.tieba.post.ui.page.LocalNavigator
 import com.huanchengfly.tieba.post.ui.page.destinations.AboutPageDestination
 import com.huanchengfly.tieba.post.ui.page.destinations.AppThemePageDestination
 import com.huanchengfly.tieba.post.ui.page.destinations.HistoryPageDestination
+import com.huanchengfly.tieba.post.ui.page.destinations.LoginPageDestination
 import com.huanchengfly.tieba.post.ui.page.destinations.SettingsPageDestination
 import com.huanchengfly.tieba.post.ui.page.destinations.ThreadStorePageDestination
 import com.huanchengfly.tieba.post.ui.page.destinations.UserProfilePageDestination
@@ -320,7 +321,8 @@ fun UserPage(
                     LoginTipCard(
                         modifier = Modifier
                             .padding(horizontal = 16.dp, vertical = 16.dp)
-                            .padding(top = 8.dp),
+                            .padding(top = 8.dp)
+                            .clickable { navigator.navigate(LoginPageDestination) },
                     )
                 }
                 if (account != null) {
