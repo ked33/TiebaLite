@@ -215,17 +215,21 @@ fun Card(
     action: @Composable (ColumnScope.() -> Unit)? = null,
     onClick: (() -> Unit)? = null,
     contentPadding: PaddingValues = PaddingValues(horizontal = 16.dp),
+    outerPadding: PaddingValues? = null,
 ) {
     val cardModifier =
         if (onClick != null) Modifier.debounceClickable(onClick = onClick) else Modifier
 
-    val paddingModifier = if (action != null) Modifier.padding(top = 16.dp)
-    else Modifier.padding(vertical = 16.dp)
+    val outerPaddingValues = outerPadding ?: if (action != null) {
+        PaddingValues(top = 16.dp)
+    } else {
+        PaddingValues(vertical = 16.dp)
+    }
 
     Column(
         modifier = cardModifier
             .then(modifier)
-            .then(paddingModifier)
+            .padding(outerPaddingValues)
             .padding(contentPadding)
     ) {
         header()
@@ -535,7 +539,7 @@ private fun ThreadMedia(
                         text = {
                             Text(text = stringResource(id = R.string.btn_open_photos, mediaCount))
                         },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth(0.5f),
                         onClick = {
                             context.goToActivity<PhotoViewActivity> {
                                 putExtra(
@@ -878,6 +882,16 @@ fun FeedCard(
     actionsOnTop: Boolean = false,
     dislikeAction: @Composable () -> Unit = {},
 ) {
+    val context = LocalContext.current
+    val hideMedia = context.appPreferences.hideMedia
+    val hasPhoto = remember(item) { item.get { media.isNotEmpty() } }
+    val hasVideo = remember(item) { item.get { videoInfo != null } }
+    val useCompactMediaPadding = actionsOnTop && hideMedia && hasPhoto && !hasVideo
+    val cardOuterPadding = if (useCompactMediaPadding) {
+        PaddingValues(top = 16.dp)
+    } else {
+        null
+    }
     val actionContent: (@Composable ColumnScope.() -> Unit)? = if (actionsOnTop) null else {
         {
             Row(modifier = Modifier.fillMaxWidth()) {
@@ -962,6 +976,7 @@ fun FeedCard(
         action = actionContent,
         onClick = { onClick(item.get()) },
         modifier = modifier,
+        outerPadding = cardOuterPadding,
     )
 }
 

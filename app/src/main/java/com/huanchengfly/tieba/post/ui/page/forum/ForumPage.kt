@@ -96,9 +96,11 @@ import com.huanchengfly.tieba.post.arch.emitGlobalEventSuspend
 import com.huanchengfly.tieba.post.arch.onEvent
 import com.huanchengfly.tieba.post.arch.onGlobalEvent
 import com.huanchengfly.tieba.post.arch.pageViewModel
+import com.huanchengfly.tieba.post.collectPreferenceAsState
 import com.huanchengfly.tieba.post.dataStore
 import com.huanchengfly.tieba.post.getBoolean
 import com.huanchengfly.tieba.post.getInt
+import com.huanchengfly.tieba.post.putBoolean
 import com.huanchengfly.tieba.post.models.ForumHistoryExtra
 import com.huanchengfly.tieba.post.models.database.History
 import com.huanchengfly.tieba.post.toastShort
@@ -152,6 +154,10 @@ import kotlin.math.min
 
 private val LoadDistance = 70.dp
 
+private fun hideSpecialThreadsKey(forumName: String): String {
+    return "${forumName}_hide_special_threads"
+}
+
 fun getSortType(
     context: Context,
     forumName: String,
@@ -164,7 +170,7 @@ private fun getHideSpecialThreads(
     context: Context,
     forumName: String,
 ): Boolean {
-    return context.dataStore.getBoolean("${forumName}_hide_special_threads", false)
+    return context.dataStore.getBoolean(hideSpecialThreadsKey(forumName), false)
 }
 
 suspend fun setSortType(
@@ -177,14 +183,12 @@ suspend fun setSortType(
     }
 }
 
-private suspend fun setHideSpecialThreads(
+private fun setHideSpecialThreads(
     context: Context,
     forumName: String,
     hide: Boolean,
 ) {
-    context.dataStore.edit {
-        it[booleanPreferencesKey("${forumName}_hide_special_threads")] = hide
-    }
+    context.dataStore.putBoolean(hideSpecialThreadsKey(forumName), hide)
 }
 
 @Composable
@@ -490,9 +494,16 @@ fun ForumPage(
             }
         )
     }
-    var hideSpecialThreads by rememberSaveable(forumName) {
-        mutableStateOf(getHideSpecialThreads(context, forumName))
+    val hideSpecialThreadsPrefKey = remember(forumName) {
+        booleanPreferencesKey(hideSpecialThreadsKey(forumName))
     }
+    val hideSpecialThreadsInitial = remember(forumName) {
+        getHideSpecialThreads(context, forumName)
+    }
+    val hideSpecialThreads by context.dataStore.collectPreferenceAsState(
+        key = hideSpecialThreadsPrefKey,
+        defaultValue = hideSpecialThreadsInitial
+    )
 
     val isListAtTop by remember {
         derivedStateOf {
@@ -955,10 +966,7 @@ fun ForumPage(
                                 IconButton(
                                     onClick = {
                                         val nextValue = !hideSpecialThreads
-                                        hideSpecialThreads = nextValue
-                                        coroutineScope.launch {
-                                            setHideSpecialThreads(context, forumName, nextValue)
-                                        }
+                                        setHideSpecialThreads(context, forumName, nextValue)
                                     },
                                     modifier = Modifier.padding(end = 8.dp)
                                 ) {
