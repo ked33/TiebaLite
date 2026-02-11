@@ -542,12 +542,8 @@ private fun ThreadMedia(
                                 Text(text = stringResource(id = R.string.btn_open_photos, mediaCount))
                             },
                             modifier = Modifier
-                                .fillMaxWidth(0.5f)
-                                .align(Alignment.TopCenter),
-                            horizontalArrangement = Arrangement.spacedBy(
-                                8.dp,
-                                Alignment.CenterHorizontally
-                            ),
+                                .fillMaxWidth(0.3f)
+                                .align(Alignment.TopStart),
                             onClick = {
                                 context.goToActivity<PhotoViewActivity> {
                                     putExtra(
