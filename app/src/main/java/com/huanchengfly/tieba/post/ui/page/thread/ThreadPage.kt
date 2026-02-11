@@ -1213,12 +1213,12 @@ fun ThreadPage(
                         )
                     },
                     scrimColor = Color.Transparent,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues)
+                    modifier = Modifier.fillMaxSize()
                 ) {
                     Box(
                         modifier = Modifier
+                            .fillMaxSize()
+                            .padding(paddingValues)
                             .pullRefresh(state = pullRefreshState, enabled = enablePullRefresh)
                     ) {
                         LoadMoreLayout(
