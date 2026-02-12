@@ -3,6 +3,7 @@ package com.huanchengfly.tieba.post.ui.page.thread
 import android.util.Log
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -82,6 +83,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -600,6 +602,22 @@ fun ThreadPage(
     var waitLoadSuccessAndScrollToFirstReply by remember { mutableStateOf(scrollToReply) }
 
     val lazyListState = rememberLazyListState()
+    val isListAtBottom by remember {
+        derivedStateOf {
+            val layoutInfo = lazyListState.layoutInfo
+            val totalItemsCount = layoutInfo.totalItemsCount
+            if (totalItemsCount == 0) {
+                return@derivedStateOf false
+            }
+            val lastVisibleItem = layoutInfo.visibleItemsInfo.lastOrNull() ?: return@derivedStateOf false
+            lastVisibleItem.index == totalItemsCount - 1 &&
+                lastVisibleItem.offset + lastVisibleItem.size <= layoutInfo.viewportEndOffset
+        }
+    }
+    val moreButtonAlpha by animateFloatAsState(
+        targetValue = if (isListAtBottom) 0f else 1f,
+        label = "threadMoreButtonAlpha"
+    )
     val bottomSheetState = rememberModalBottomSheetState(
         initialValue = ModalBottomSheetValue.Hidden,
         skipHalfExpanded = true
@@ -1097,6 +1115,7 @@ fun ThreadPage(
                                     openBottomSheet()
                                 }
                             },
+                            moreButtonAlpha = moreButtonAlpha,
                             modifier = Modifier
                                 .clickable(
                                     interactionSource = remember { MutableInteractionSource() },
@@ -1118,7 +1137,9 @@ fun ThreadPage(
                             },
                             backgroundColor = ExtendedTheme.colors.windowBackground,
                             contentColor = ExtendedTheme.colors.primary,
-                            modifier = Modifier.navigationBarsPadding()
+                            modifier = Modifier
+                                .navigationBarsPadding()
+                                .alpha(moreButtonAlpha)
                         ) {
                             Icon(
                                 imageVector = Icons.Rounded.MoreVert,
@@ -1684,6 +1705,7 @@ private fun BottomBar(
     user: ImmutableHolder<User>,
     onClickReply: () -> Unit,
     onClickMore: () -> Unit,
+    moreButtonAlpha: Float,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -1725,6 +1747,7 @@ private fun BottomBar(
                 onClick = onClickMore,
                 backgroundColor = ExtendedTheme.colors.windowBackground,
                 contentColor = ExtendedTheme.colors.primary,
+                modifier = Modifier.alpha(moreButtonAlpha)
             ) {
                 Icon(
                     imageVector = Icons.Rounded.MoreVert,
