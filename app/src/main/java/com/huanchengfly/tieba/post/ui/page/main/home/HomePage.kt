@@ -422,7 +422,7 @@ private fun ForumItem(
 @OptIn(ExperimentalMaterialApi::class)
 @Composable
 fun HomePage(
-    viewModel: HomeViewModel = pageViewModel<HomeUiIntent, HomeViewModel>(listOf(HomeUiIntent.Refresh)),
+    viewModel: HomeViewModel = pageViewModel(),
     canOpenExplore: Boolean = false,
     onOpenExplore: () -> Unit = {},
 ) {
@@ -431,7 +431,7 @@ fun HomePage(
     val navigator = LocalNavigator.current
     val isLoading by viewModel.uiState.collectPartialAsState(
         prop1 = HomeUiState::isLoading,
-        initial = true
+        initial = false
     )
     val forums by viewModel.uiState.collectPartialAsState(
         prop1 = HomeUiState::forums,
@@ -464,7 +464,7 @@ fun HomePage(
     onGlobalEvent<GlobalEvent.Refresh>(
         filter = { it.key == "home" }
     ) {
-        viewModel.send(HomeUiIntent.Refresh)
+        if (isLoggedIn) viewModel.send(HomeUiIntent.Refresh)
     }
 
     var unfollowForum by remember { mutableStateOf<HomeUiState.Forum?>(null) }
@@ -486,7 +486,10 @@ fun HomePage(
     }
 
     LaunchedEffect(Unit) {
-        if (viewModel.initialized) viewModel.send(HomeUiIntent.RefreshHistory)
+        if (isLoggedIn && !viewModel.initialized) {
+            viewModel.send(HomeUiIntent.RefreshHistory)
+            viewModel.send(HomeUiIntent.Refresh)
+        }
     }
 
     MyScaffold(
@@ -516,7 +519,7 @@ fun HomePage(
     ) { contentPaddings ->
         val pullRefreshState = rememberPullRefreshState(
             refreshing = isLoading,
-            onRefresh = { viewModel.send(HomeUiIntent.Refresh) }
+            onRefresh = { if (isLoggedIn) viewModel.send(HomeUiIntent.Refresh) }
         )
         Box(
             modifier = Modifier
@@ -535,7 +538,7 @@ fun HomePage(
                         .fillMaxSize()
                         .weight(1f),
                     onReload = {
-                        viewModel.send(HomeUiIntent.Refresh)
+                        if (isLoggedIn) viewModel.send(HomeUiIntent.Refresh)
                     },
                     emptyScreen = {
                         EmptyScreen(

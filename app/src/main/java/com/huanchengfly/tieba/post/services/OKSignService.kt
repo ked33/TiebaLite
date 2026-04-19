@@ -135,7 +135,7 @@ class OKSignService : IntentService(TAG), CoroutineScope, ProgressListener {
         )
     }
 
-    private fun updateNotification(title: String, text: String?) {
+    private fun updateNotification(title: String, text: String?, isUnique: Boolean? = false) {
         if (ActivityCompat.checkSelfPermission(
                 this,
                 Manifest.permission.POST_NOTIFICATIONS
@@ -145,8 +145,16 @@ class OKSignService : IntentService(TAG), CoroutineScope, ProgressListener {
         }
         val notification = buildNotification(title, text)
             .build()
-        notification.flags = notification.flags.addFlag(NotificationCompat.FLAG_ONGOING_EVENT)
-        notificationManager.notify(NOTIFICATION_ID, notification)
+
+        if (isUnique == true) {
+            notification.flags = notification.flags and NotificationCompat.FLAG_ONGOING_EVENT.inv()
+        } else {
+            notification.flags = notification.flags or NotificationCompat.FLAG_ONGOING_EVENT
+        }
+        notificationManager.notify(
+            if (isUnique == true) System.currentTimeMillis().toInt() else NOTIFICATION_ID,
+            notification
+        )
     }
 
     private fun clearNotification() {
@@ -230,13 +238,14 @@ class OKSignService : IntentService(TAG), CoroutineScope, ProgressListener {
                 updateNotification(getString(R.string.title_oksign_fail), errorMsg)
             } else {
                 updateNotification(
+                    getString(R.string.title_oksign_fail),
                     getString(
-                        R.string.title_signing_progress,
-                        it.userName,
-                        current + 1,
-                        total
+                        R.string.text_singing_progress_fail,
+                        it.forumName,
+                        errorCode,
+                        errorMsg
                     ),
-                    getString(R.string.text_singing_progress_fail, it.forumName, errorMsg)
+                    true
                 )
             }
         }

@@ -168,14 +168,12 @@ inline fun <INTENT : UiIntent, reified VM : BaseViewModel<INTENT, *, *, *>> page
 ): VM {
     return pageViewModel<VM>(key = key).apply {
         if (initialIntent.isNotEmpty()) {
-            LaunchedEffect(key1 = initialized) {
-                if (!initialized) {
-                    initialized = true
-                    initialIntent.asFlow()
-                        .onEach(this@apply::send)
-                        .flowOn(Dispatchers.IO)
-                        .launchIn(viewModelScope)
-                }
+            if (!initialized) {
+                initialized = true
+                initialIntent.asFlow()
+                    .onEach(this@apply::send)
+                    .flowOn(Dispatchers.IO)
+                    .launchIn(viewModelScope)
             }
         }
     }

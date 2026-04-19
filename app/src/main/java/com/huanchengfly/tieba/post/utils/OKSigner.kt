@@ -194,7 +194,21 @@ class SingleAccountSigner(
                         }
                         result = true
                     }
-                    .flatMapConcat { signFlow(it) }
+                    .flatMapConcat {
+                        if (!context.appPreferences.oksignFailAutoStop) {
+                            signFlow(it).catch { e ->
+                                result = false
+                                lastFailure = e
+                                mProgressListener?.onFailure(
+                                    position,
+                                    totalCount,
+                                    e.getErrorCode(),
+                                    e.getErrorMessage()
+                                )
+                                delay(getSignDelay())
+                            }
+                        } else signFlow(it)
+                    }
             }
             .catch { e ->
                 result = false

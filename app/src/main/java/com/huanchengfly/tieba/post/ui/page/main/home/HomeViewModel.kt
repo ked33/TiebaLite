@@ -271,7 +271,7 @@ sealed interface HomePartialChange : PartialChange<HomeUiState> {
 
 @Immutable
 data class HomeUiState(
-    val isLoading: Boolean = true,
+    val isLoading: Boolean = false,
     val forums: ImmutableList<Forum> = persistentListOf(),
     val topForums: ImmutableList<Forum> = persistentListOf(),
     val historyForums: ImmutableList<History> = persistentListOf(),

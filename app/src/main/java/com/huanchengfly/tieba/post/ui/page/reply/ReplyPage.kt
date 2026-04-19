@@ -29,7 +29,6 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredHeightIn
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -56,7 +55,6 @@ import androidx.compose.material.icons.outlined.InsertPhoto
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
@@ -107,7 +105,6 @@ import com.huanchengfly.tieba.post.ui.widgets.compose.DialogPositiveButton
 import com.huanchengfly.tieba.post.ui.widgets.compose.DialogState
 import com.huanchengfly.tieba.post.ui.widgets.compose.MyBackHandler
 import com.huanchengfly.tieba.post.ui.widgets.compose.VerticalDivider
-import com.huanchengfly.tieba.post.ui.widgets.compose.debounceClickable
 import com.huanchengfly.tieba.post.ui.widgets.compose.rememberDialogState
 import com.huanchengfly.tieba.post.ui.widgets.edittext.widget.UndoableEditText
 import com.huanchengfly.tieba.post.utils.AccountUtil
@@ -337,9 +334,9 @@ internal fun ReplyPageContent(
     var startClosingAnimation by remember { mutableStateOf(false) }
 
     fun showKeyboard() {
-        editTextView?.apply {
-            showKeyboard(context, this)
-            requestFocus()
+        editTextView?.post {
+            editTextView?.requestFocus()
+            showKeyboard(context, editTextView!!)
         }
         keyboardController?.show()
     }
@@ -654,11 +651,11 @@ internal fun ReplyPageContent(
                 }
             }
         }
-        Spacer(
-            modifier = Modifier
-                .fillMaxWidth()
-                .windowInsetsBottomHeight(WindowInsets.ime)
-        )
+//        Spacer(
+//            modifier = Modifier
+//                .fillMaxWidth()
+//                .windowInsetsPadding(WindowInsets.ime)
+//        )
         if (curKeyboardType != NONE) {
             Column(modifier = Modifier.height(panelHeight)) {
                 when (curKeyboardType) {
@@ -687,8 +684,8 @@ internal fun ReplyPageContent(
                                 viewModel.send(ReplyUiIntent.ToggleIsOriginImage(it))
                             },
                             modifier = Modifier
-                                .fillMaxSize()
-                                .padding(16.dp),
+                                .padding(16.dp, 8.dp)
+                                .fillMaxSize(),
                         )
                     }
 
@@ -864,7 +861,7 @@ private fun ImagePanel(
 
     Column(
         modifier = modifier,
-        verticalArrangement = Arrangement.Center
+        verticalArrangement = Arrangement.Top
     ) {
         LazyRow(
             modifier = Modifier
