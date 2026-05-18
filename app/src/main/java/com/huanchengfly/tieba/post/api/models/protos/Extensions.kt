@@ -382,17 +382,21 @@ val User.bawuType: String?
     } else null
 
 val Post.subPostContents: ImmutableList<AnnotatedString>
-    get() = sub_post_list?.sub_post_list?.map { it.getContentText(origin_thread_info?.author?.id) }
+    get() = sub_post_list?.sub_post_list?.sortedByReplyTimeAsc()
+        ?.map { it.getContentText(origin_thread_info?.author?.id) }
         ?.toImmutableList()
         ?: persistentListOf()
 
 val Post.subPosts: ImmutableList<SubPostItemData>
-    get() = sub_post_list?.sub_post_list?.map {
+    get() = sub_post_list?.sub_post_list?.sortedByReplyTimeAsc()?.map {
         SubPostItemData(
             it.wrapImmutable(),
             it.getContentText(origin_thread_info?.author?.id)
         )
     }?.toImmutableList() ?: persistentListOf()
+
+fun List<SubPostList>.sortedByReplyTimeAsc(): List<SubPostList> =
+    sortedWith(compareBy<SubPostList> { it.time }.thenBy { it.floor }.thenBy { it.id })
 
 @OptIn(ExperimentalTextApi::class)
 fun SubPostList.getContentText(threadAuthorId: Long? = null): AnnotatedString {

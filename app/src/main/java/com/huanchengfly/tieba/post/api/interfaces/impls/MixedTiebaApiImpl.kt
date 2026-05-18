@@ -1299,7 +1299,7 @@ object MixedTiebaApiImpl : ITiebaApi {
                         banner = 0,
                         broadcast_id = 0,
                         floor_rn = 4,
-                        floor_sort_type = 1,
+                        floor_sort_type = 0,
                         from_push = 0,
                         from_smart_frs = 0,
                         immersion_video_comment_source = 0,
