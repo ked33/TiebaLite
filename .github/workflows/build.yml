@@ -13,7 +13,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
 
     steps:
       - name: Checkout
@@ -101,38 +101,9 @@ jobs:
 
       - name: Upload Release Package
         uses: actions/upload-artifact@v4
-        if: ${{ ! startsWith(github.ref, 'refs/tags/') }}
         with:
           name: "release-${{ steps.apk_meta.outputs.version_name }}(${{ steps.apk_meta.outputs.version_code }})"
           path: ./app/build/outputs/apk/release
-
-      - name: Compute Release Meta
-        id: release_meta
-        env:
-          version_code: ${{ steps.apk_meta.outputs.version_code }}
-          version_name: ${{ steps.apk_meta.outputs.version_name }}
-        run: |
-          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
-            tag="${GITHUB_REF#refs/tags/}"
-            name="release-${version_name}(${version_code})"
-            prerelease="false"
-          else
-            tag="ci-${GITHUB_RUN_ID}"
-            name="ci-${version_name}(${version_code})"
-            prerelease="true"
-          fi
-          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
-          echo "name=${name}" >> "$GITHUB_OUTPUT"
-          echo "prerelease=${prerelease}" >> "$GITHUB_OUTPUT"
-
-      - name: Publish Release APK
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.release_meta.outputs.tag }}
-          name: ${{ steps.release_meta.outputs.name }}
-          prerelease: ${{ steps.release_meta.outputs.prerelease == 'true' }}
-          target_commitish: ${{ github.sha }}
-          files: ./app/build/outputs/apk/release/*.apk
 
 #      - name: Upload Mapping
 #        uses: actions/upload-artifact@v4
