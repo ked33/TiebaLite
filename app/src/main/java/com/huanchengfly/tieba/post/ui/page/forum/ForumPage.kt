@@ -111,6 +111,7 @@ import com.huanchengfly.tieba.post.ui.page.destinations.ForumDetailPageDestinati
 import com.huanchengfly.tieba.post.ui.page.destinations.ForumSearchPostPageDestination
 import com.huanchengfly.tieba.post.ui.page.destinations.ReplyPageDestination
 import com.huanchengfly.tieba.post.ui.page.forum.threadlist.ForumThreadListPage
+import com.huanchengfly.tieba.post.ui.page.forum.threadlist.ForumThreadListType
 import com.huanchengfly.tieba.post.ui.page.forum.threadlist.ForumThreadListUiEvent
 import com.huanchengfly.tieba.post.ui.widgets.compose.Avatar
 import com.huanchengfly.tieba.post.ui.widgets.compose.AvatarPlaceholder
@@ -470,8 +471,9 @@ fun ForumPage(
     val tbs by viewModel.uiState.collectPartialAsState(prop1 = ForumUiState::tbs, initial = null)
 
     val account = LocalAccount.current
-    val pagerState = rememberPagerState { 2 }
+    val pagerState = rememberPagerState { 3 }
     val latestListState = rememberLazyListState()
+    val hotListState = rememberLazyListState()
     val goodListState = rememberLazyListState()
 
     val currentPage by remember {
@@ -480,7 +482,21 @@ fun ForumPage(
         }
     }
 
-    val currentListState = if (currentPage == 0) latestListState else goodListState
+    val currentListType by remember {
+        derivedStateOf {
+            when (currentPage) {
+                1 -> ForumThreadListType.Hot
+                2 -> ForumThreadListType.Good
+                else -> ForumThreadListType.Latest
+            }
+        }
+    }
+
+    val currentListState = when (currentListType) {
+        ForumThreadListType.Latest -> latestListState
+        ForumThreadListType.Hot -> hotListState
+        ForumThreadListType.Good -> goodListState
+    }
 
     val coroutineScope = rememberCoroutineScope()
 
@@ -567,12 +583,12 @@ fun ForumPage(
         coroutineScope.launch {
             emitGlobalEventSuspend(
                 ForumThreadListUiEvent.BackToTop(
-                    currentPage == 1
+                    currentListType
                 )
             )
             emitGlobalEventSuspend(
                 ForumThreadListUiEvent.Refresh(
-                    currentPage == 1,
+                    currentListType,
                     getSortType(
                         context,
                         forumName
@@ -689,12 +705,12 @@ fun ForumPage(
                                         coroutineScope.launch {
                                             emitGlobalEventSuspend(
                                                 ForumThreadListUiEvent.BackToTop(
-                                                    currentPage == 1
+                                                    currentListType
                                                 )
                                             )
                                             emitGlobalEventSuspend(
                                                 ForumThreadListUiEvent.Refresh(
-                                                    currentPage == 1,
+                                                    currentListType,
                                                     getSortType(
                                                         context,
                                                         forumName
@@ -708,7 +724,7 @@ fun ForumPage(
                                         coroutineScope.launch {
                                             emitGlobalEvent(
                                                 ForumThreadListUiEvent.BackToTop(
-                                                    currentPage == 1
+                                                    currentListType
                                                 )
                                             )
                                         }
@@ -753,7 +769,7 @@ fun ForumPage(
                     onRefresh = {
                         coroutineScope.emitGlobalEvent(
                             ForumThreadListUiEvent.Refresh(
-                                currentPage == 1,
+                                currentListType,
                                 getSortType(
                                     context,
                                     forumName
@@ -927,7 +943,7 @@ fun ForumPage(
                                                             setSortType(context, forumName, value)
                                                             emitGlobalEvent(
                                                                 ForumThreadListUiEvent.Refresh(
-                                                                    currentPage == 1,
+                                                                    ForumThreadListType.Latest,
                                                                     value
                                                                 )
                                                             )
@@ -945,6 +961,28 @@ fun ForumPage(
                                         onClick = {
                                             coroutineScope.launch {
                                                 pagerState.animateScrollToPage(1)
+                                            }
+                                        },
+                                        selectedContentColor = ExtendedTheme.colors.primary,
+                                        unselectedContentColor = ExtendedTheme.colors.textSecondary
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier
+                                                .height(48.dp)
+                                                .padding(horizontal = 16.dp)
+                                        ) {
+                                            Text(
+                                                text = stringResource(id = R.string.tab_forum_hot),
+                                                style = tabTextStyle
+                                            )
+                                        }
+                                    }
+                                    Tab(
+                                        selected = currentPage == 2,
+                                        onClick = {
+                                            coroutineScope.launch {
+                                                pagerState.animateScrollToPage(2)
                                             }
                                         },
                                         selectedContentColor = ExtendedTheme.colors.primary,
@@ -999,9 +1037,17 @@ fun ForumPage(
                                     ForumThreadListPage(
                                         forumId = forumInfo!!.get { id },
                                         forumName = forumInfo!!.get { name },
-                                        isGood = it == 1,
+                                        type = when (it) {
+                                            1 -> ForumThreadListType.Hot
+                                            2 -> ForumThreadListType.Good
+                                            else -> ForumThreadListType.Latest
+                                        },
                                         hideSpecialThreads = hideSpecialThreads,
-                                        lazyListState = if (it == 0) latestListState else goodListState
+                                        lazyListState = when (it) {
+                                            1 -> hotListState
+                                            2 -> goodListState
+                                            else -> latestListState
+                                        }
                                     )
                                 }
                             }
@@ -1050,6 +1096,7 @@ fun LoadingPlaceholder(
             Row(modifier = Modifier.height(48.dp)) {
                 persistentListOf(
                     stringResource(id = R.string.tab_forum_latest),
+                    stringResource(id = R.string.tab_forum_hot),
                     stringResource(id = R.string.tab_forum_good),
                 ).fastForEach {
                     Box(

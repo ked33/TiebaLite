@@ -71,20 +71,20 @@ import kotlinx.collections.immutable.persistentListOf
 private fun getFirstLoadIntent(
     context: Context,
     forumName: String,
-    isGood: Boolean = false,
+    type: ForumThreadListType = ForumThreadListType.Latest,
 ): ForumThreadListUiIntent {
-    return if (isGood) ForumThreadListUiIntent.Refresh(forumName, -1, 0)
+    return if (type == ForumThreadListType.Good) ForumThreadListUiIntent.Refresh(forumName, -1, 0)
     else ForumThreadListUiIntent.FirstLoad(forumName, getSortType(context, forumName), null)
 }
 
 private fun getRefreshIntent(
     context: Context,
     forumName: String,
-    isGood: Boolean = false,
+    type: ForumThreadListType = ForumThreadListType.Latest,
     sortType: Int = getSortType(context, forumName),
-    goodClassifyId: Int? = if (isGood) 0 else null,
+    goodClassifyId: Int? = if (type == ForumThreadListType.Good) 0 else null,
 ): ForumThreadListUiIntent {
-    return if (isGood) ForumThreadListUiIntent.Refresh(forumName, -1, goodClassifyId)
+    return if (type == ForumThreadListType.Good) ForumThreadListUiIntent.Refresh(forumName, -1, goodClassifyId)
     else ForumThreadListUiIntent.Refresh(forumName, sortType, null)
 }
 
@@ -94,9 +94,9 @@ private fun getLoadMoreIntent(
     forumName: String,
     page: Int,
     threadListIds: List<Long>,
-    isGood: Boolean = false,
+    type: ForumThreadListType = ForumThreadListType.Latest,
 ): ForumThreadListUiIntent {
-    return if (isGood) ForumThreadListUiIntent.LoadMore(forumId, forumName, page, threadListIds, 0)
+    return if (type == ForumThreadListType.Good) ForumThreadListUiIntent.LoadMore(forumId, forumName, page, threadListIds, 0)
     else ForumThreadListUiIntent.LoadMore(
         forumId,
         forumName,
@@ -268,9 +268,13 @@ private fun ThreadList(
 fun ForumThreadListPage(
     forumId: Long,
     forumName: String,
-    isGood: Boolean = false,
+    type: ForumThreadListType = ForumThreadListType.Latest,
     hideSpecialThreads: Boolean = false,
-    viewModel: ForumThreadListViewModel = if (isGood) pageViewModel<GoodThreadListViewModel>() else pageViewModel<LatestThreadListViewModel>(),
+    viewModel: ForumThreadListViewModel = when (type) {
+        ForumThreadListType.Latest -> pageViewModel<LatestThreadListViewModel>()
+        ForumThreadListType.Hot -> pageViewModel<HotThreadListViewModel>()
+        ForumThreadListType.Good -> pageViewModel<GoodThreadListViewModel>()
+    },
     lazyListState: LazyListState = rememberLazyListState()
 ) {
     val context = LocalContext.current
@@ -278,16 +282,16 @@ fun ForumThreadListPage(
     val snackbarHostState = LocalSnackbarHostState.current
 
     LazyLoad(loaded = viewModel.initialized) {
-        viewModel.send(getFirstLoadIntent(context, forumName, isGood))
+        viewModel.send(getFirstLoadIntent(context, forumName, type))
         viewModel.initialized = true
     }
     onGlobalEvent<ForumThreadListUiEvent.Refresh>(
-        filter = { it.isGood == isGood },
+        filter = { it.type == type },
     ) {
-        viewModel.send(getRefreshIntent(context, forumName, isGood, it.sortType))
+        viewModel.send(getRefreshIntent(context, forumName, type, it.sortType))
     }
     onGlobalEvent<ForumThreadListUiEvent.BackToTop>(
-        filter = { it.isGood == isGood },
+        filter = { it.type == type },
     ) {
         lazyListState.animateScrollToItem(0)
     }
@@ -349,7 +353,7 @@ fun ForumThreadListPage(
     )
     val pullRefreshState = rememberPullRefreshState(
         refreshing = isRefreshing,
-        onRefresh = { viewModel.send(getRefreshIntent(context, forumName, isGood)) }
+        onRefresh = { viewModel.send(getRefreshIntent(context, forumName, type)) }
     )
     Box(
         modifier = Modifier.fillMaxSize()
@@ -357,7 +361,7 @@ fun ForumThreadListPage(
         Column(
             modifier = Modifier.fillMaxSize()
         ) {
-            if (isGood) {
+            if (type == ForumThreadListType.Good) {
                 GoodClassifyTabs(
                     goodClassifyHolders = goodClassifies,
                     selectedItem = goodClassifyId,
@@ -366,7 +370,7 @@ fun ForumThreadListPage(
                             getRefreshIntent(
                                 context,
                                 forumName,
-                                true,
+                                ForumThreadListType.Good,
                                 goodClassifyId = it
                             )
                         )
@@ -384,7 +388,7 @@ fun ForumThreadListPage(
                             forumName,
                             currentPage,
                             threadListIds,
-                            isGood
+                            type
                         )
                     )
                 },

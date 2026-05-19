@@ -1,6 +1,7 @@
 package com.huanchengfly.tieba.post.ui.page.forum.threadlist
 
 import androidx.compose.runtime.Stable
+import com.huanchengfly.tieba.post.api.ForumSortType
 import com.huanchengfly.tieba.post.api.TiebaApi
 import com.huanchengfly.tieba.post.api.models.AgreeBean
 import com.huanchengfly.tieba.post.api.models.protos.frsPage.Classify
@@ -60,7 +61,7 @@ abstract class ForumThreadListViewModel :
 }
 
 enum class ForumThreadListType {
-    Latest, Good
+    Latest, Hot, Good
 }
 
 @Stable
@@ -72,6 +73,13 @@ class LatestThreadListViewModel @Inject constructor() : ForumThreadListViewModel
 
 @Stable
 @HiltViewModel
+class HotThreadListViewModel @Inject constructor() : ForumThreadListViewModel() {
+    override fun createPartialChangeProducer(): PartialChangeProducer<ForumThreadListUiIntent, ForumThreadListPartialChange, ForumThreadListUiState> =
+        ForumThreadListPartialChangeProducer(ForumThreadListType.Hot)
+}
+
+@Stable
+@HiltViewModel
 class GoodThreadListViewModel @Inject constructor() : ForumThreadListViewModel() {
     override fun createPartialChangeProducer(): PartialChangeProducer<ForumThreadListUiIntent, ForumThreadListPartialChange, ForumThreadListUiState> =
         ForumThreadListPartialChangeProducer(ForumThreadListType.Good)
@@ -79,6 +87,22 @@ class GoodThreadListViewModel @Inject constructor() : ForumThreadListViewModel()
 
 private class ForumThreadListPartialChangeProducer(val type: ForumThreadListType) :
     PartialChangeProducer<ForumThreadListUiIntent, ForumThreadListPartialChange, ForumThreadListUiState> {
+    private fun frsSortType(sortType: Int): Int =
+        when (type) {
+            ForumThreadListType.Latest -> sortType
+            ForumThreadListType.Hot -> ForumSortType.HOT.value
+            ForumThreadListType.Good -> -1
+        }
+
+    private fun threadListSortType(sortType: Int): Int =
+        when (type) {
+            ForumThreadListType.Hot -> ForumSortType.HOT.value
+            else -> sortType
+        }
+
+    private fun scopedGoodClassifyId(goodClassifyId: Int?): Int? =
+        goodClassifyId.takeIf { type == ForumThreadListType.Good }
+
     @OptIn(ExperimentalCoroutinesApi::class)
     override fun toPartialChangeFlow(intentFlow: Flow<ForumThreadListUiIntent>): Flow<ForumThreadListPartialChange> =
         merge(
@@ -97,8 +121,8 @@ private class ForumThreadListPartialChangeProducer(val type: ForumThreadListType
             forumName,
             1,
             1,
-            sortType.takeIf { type == ForumThreadListType.Latest } ?: -1,
-            goodClassifyId.takeIf { type == ForumThreadListType.Good }
+            frsSortType(sortType),
+            scopedGoodClassifyId(goodClassifyId)
         )
             .map<FrsPageResponse, ForumThreadListPartialChange.FirstLoad> { response ->
                 if (response.data_?.page == null) throw TiebaUnknownException
@@ -111,7 +135,7 @@ private class ForumThreadListPartialChangeProducer(val type: ForumThreadListType
                     threadList,
                     response.data_.thread_id_list,
                     (response.data_.forum?.good_classify ?: emptyList()).wrapImmutable(),
-                    goodClassifyId.takeIf { type == ForumThreadListType.Good },
+                    scopedGoodClassifyId(goodClassifyId),
                     response.data_.page.has_more == 1
                 )
             }
@@ -123,8 +147,8 @@ private class ForumThreadListPartialChangeProducer(val type: ForumThreadListType
             forumName,
             1,
             1,
-            sortType.takeIf { type == ForumThreadListType.Latest } ?: -1,
-            goodClassifyId.takeIf { type == ForumThreadListType.Good },
+            frsSortType(sortType),
+            scopedGoodClassifyId(goodClassifyId),
             forceNew = true
         )
             .map<FrsPageResponse, ForumThreadListPartialChange.Refresh> { response ->
@@ -135,7 +159,7 @@ private class ForumThreadListPartialChangeProducer(val type: ForumThreadListType
                     threadList,
                     response.data_.thread_id_list,
                     (response.data_.forum?.good_classify ?: emptyList()).wrapImmutable(),
-                    goodClassifyId.takeIf { type == ForumThreadListType.Good },
+                    scopedGoodClassifyId(goodClassifyId),
                     response.data_.page.has_more == 1
                 )
             }
@@ -149,7 +173,7 @@ private class ForumThreadListPartialChangeProducer(val type: ForumThreadListType
                 forumId,
                 forumName,
                 currentPage,
-                sortType,
+                threadListSortType(sortType),
                 threadListIds.subList(0, size).joinToString(separator = ",") { "$it" }
             ).map { response ->
                 if (response.data_ == null) throw TiebaUnknownException
@@ -167,8 +191,8 @@ private class ForumThreadListPartialChangeProducer(val type: ForumThreadListType
                 forumName,
                 currentPage + 1,
                 2,
-                sortType.takeIf { type == ForumThreadListType.Latest } ?: -1,
-                goodClassifyId.takeIf { type == ForumThreadListType.Good }
+                frsSortType(sortType),
+                scopedGoodClassifyId(goodClassifyId)
             )
                 .map<FrsPageResponse, ForumThreadListPartialChange.LoadMore> { response ->
                     if (response.data_?.page == null) throw TiebaUnknownException
@@ -421,15 +445,15 @@ sealed interface ForumThreadListUiEvent : UiEvent {
     ) : ForumThreadListUiEvent
 
     data class Refresh(
-        val isGood: Boolean,
+        val type: ForumThreadListType,
         val sortType: Int
     ) : ForumThreadListUiEvent
 
     data class BackToTop(
-        val isGood: Boolean
+        val type: ForumThreadListType
     ) : ForumThreadListUiEvent
 
     data class AddThread(
         val forumName: String,
-    ):ForumThreadListUiEvent
+    ) : ForumThreadListUiEvent
 }

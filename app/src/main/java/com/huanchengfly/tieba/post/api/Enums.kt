@@ -13,6 +13,7 @@ enum class ClientVersion(val version: String) {
 enum class ForumSortType(val value: Int) {
     REPLY_TIME(0),
     SEND_TIME(1),
+    HOT(3),
     ONLY_FOLLOWED(2);
 
     override fun toString(): String {
@@ -25,6 +26,7 @@ enum class ForumSortType(val value: Int) {
             return when (value) {
                 REPLY_TIME.value -> REPLY_TIME
                 SEND_TIME.value -> SEND_TIME
+                HOT.value -> HOT
                 ONLY_FOLLOWED.value -> ONLY_FOLLOWED
                 else -> throw IllegalArgumentException()
             }
