@@ -4,6 +4,7 @@ import com.huanchengfly.tieba.post.api.ForumSortType
 import com.huanchengfly.tieba.post.api.SearchThreadFilter
 import com.huanchengfly.tieba.post.api.SearchThreadOrder
 import com.huanchengfly.tieba.post.api.models.*
+import com.huanchengfly.tieba.post.api.models.protos.GeneralTabList.GeneralTabListResponse
 import com.huanchengfly.tieba.post.api.models.protos.addPost.AddPostResponse
 import com.huanchengfly.tieba.post.api.models.protos.addPollPost.AddPollPostReponse
 import com.huanchengfly.tieba.post.api.models.protos.forumGuide.ForumGuideResponse
@@ -881,6 +882,28 @@ interface ITiebaApi {
         tbs: String
     ): Flow<CommonResponse>
 
+    /**
+     * 关注列表（客户端接口）
+     *
+     * **需登录**
+     *
+     * @param page 分页页码
+     * @param uid 用户 uid，留空表示当前登录用户
+     */
+    fun followListFlow(
+        page: Int = 1,
+        uid: Long? = null,
+    ): Flow<FollowListBean>
+
+    /**
+     * 获取用户所有关注（客户端接口，自动翻页聚合）
+     *
+     * **需登录**
+     *
+     * @param uid 用户 uid，留空表示当前登录用户
+     */
+    fun getAllFollowFlow(uid: Long? = null): Flow<FollowListBean>
+
     fun hotMessageList(): Call<HotMessageListBean>
 
     /**
@@ -1396,6 +1419,22 @@ interface ITiebaApi {
         sortType: Int,
         threadIds: String = "",
     ): Flow<ThreadListResponse>
+
+    /**
+     * 吧页面 - 通用标签列表
+     */
+    fun generalTabList(
+        forumId: Long,
+        forumName: String,
+        tabId: Int,
+        tabType: Int,
+        tabName: String,
+        isGeneralTab: Int,
+        pn: Int = 1,
+        sortType: Int = -1,
+        lastThreadId: Long = 0,
+        isDefaultNavTab: Int = 0,
+    ): Flow<GeneralTabListResponse>
 
     fun syncFlow(clientId: String? = null): Flow<Sync>
 

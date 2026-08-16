@@ -128,7 +128,9 @@ import com.huanchengfly.tieba.post.models.database.History
 import com.huanchengfly.tieba.post.toJson
 import com.huanchengfly.tieba.post.toastShort
 import com.huanchengfly.tieba.post.ui.common.PbContentRender
+import com.huanchengfly.tieba.post.ui.common.PicContentRender
 import com.huanchengfly.tieba.post.ui.common.PbContentText
+import com.huanchengfly.tieba.post.ui.common.PicWaterfallContentRender
 import com.huanchengfly.tieba.post.ui.common.theme.compose.ExtendedTheme
 import com.huanchengfly.tieba.post.ui.common.theme.compose.invertChipBackground
 import com.huanchengfly.tieba.post.ui.common.theme.compose.invertChipContent
@@ -709,12 +711,14 @@ fun ThreadPage(
     }
 
     val updateCollectMarkDialogState = rememberDialogState()
+    var collectPromptHandled by remember { mutableStateOf(false) }
     var readFloorBeforeBack by remember {
         mutableIntStateOf(1)
     }
     ConfirmDialog(
         dialogState = updateCollectMarkDialogState,
         onConfirm = {
+            collectPromptHandled = true
             coroutineScope.launch {
                 navigator.navigateUp()
                 if (lastVisibilityPostId != 0L) {
@@ -733,13 +737,20 @@ fun ThreadPage(
             }
         },
         onCancel = {
+            collectPromptHandled = true
             navigator.navigateUp()
+        },
+        onDismiss = {
+            if (!collectPromptHandled) {
+                collectPromptHandled = true
+                navigator.navigateUp()
+            }
         }
     ) {
         Text(text = stringResource(R.string.message_update_collect_mark, readFloorBeforeBack))
     }
     MyBackHandler(
-        enabled = isCollected && !bottomSheetState.isVisible,
+        enabled = isCollected && !bottomSheetState.isVisible && !updateCollectMarkDialogState.show,
         currentScreen = ThreadPageDestination
     ) {
         readFloorBeforeBack = lastVisibilityPost?.get { floor } ?: 0
@@ -842,35 +853,30 @@ fun ThreadPage(
 
     var savedHistory by remember { mutableStateOf(false) }
     LaunchedEffect(threadId, threadTitle, author, lastVisibilityPostId) {
-        val saveHistory = {
-            thread {
-                runCatching {
-                    if (threadTitle.isNotBlank()) {
-                        HistoryUtil.saveHistory(
-                            History(
-                                title = threadTitle,
-                                data = threadId.toString(),
-                                type = HistoryUtil.TYPE_THREAD,
-                                extras = ThreadHistoryInfoBean(
-                                    isSeeLz = isSeeLz,
-                                    pid = lastVisibilityPostId.toString(),
-                                    forumName = forum?.get { name },
-                                    floor = lastVisibilityPost?.get { floor }?.toString()
-                                ).toJson(),
-                                avatar = StringUtil.getAvatarUrl(author?.get { portrait }),
-                                username = author?.get { nameShow }
-                            ),
-                            async = true
-                        )
-                        savedHistory = true
-                        Log.i("ThreadPage", "saveHistory $lastVisibilityPostId")
-                    }
-                }
-            }
-        }
-
         if ((!savedHistory || lastVisibilityPostId != 0L) && !context.appPreferences.incognitoMode) {
-            saveHistory()
+            try {
+                if (threadTitle.isNotBlank()) {
+                    HistoryUtil.saveHistory(
+                        History(
+                            title = threadTitle,
+                            data = threadId.toString(),
+                            type = HistoryUtil.TYPE_THREAD,
+                            extras = ThreadHistoryInfoBean(
+                                isSeeLz = isSeeLz,
+                                pid = lastVisibilityPostId.toString(),
+                                forumName = forum?.get { name },
+                                floor = lastVisibilityPost?.get { floor }?.toString()
+                            ).toJson(),
+                            avatar = StringUtil.getAvatarUrl(author?.get { portrait }),
+                            username = author?.get { nameShow }
+                        )
+                    )
+                    savedHistory = true
+                    Log.i("ThreadPage", "saveHistory $lastVisibilityPostId")
+                }
+            } catch (throwable: Throwable) {
+                Log.w("ThreadPage", "saveHistory failed", throwable)
+            }
         }
     }
 
@@ -2170,7 +2176,19 @@ fun PostCard(
                             )
                         }
 
-                        contentRenders.fastForEach { it.Render() }
+                        var waterfallImages: MutableList<PicContentRender>? = null
+
+                        contentRenders.forEach { render ->
+                            if (render is PicContentRender) {
+                                if (waterfallImages == null) waterfallImages = mutableListOf()
+                                waterfallImages!!.add(render)
+                            } else {
+                                waterfallImages?.let { PicWaterfallContentRender(it) }
+                                waterfallImages = null
+                                render.Render()
+                            }
+                        }
+                        waterfallImages?.let { PicWaterfallContentRender(it) }
                     }
 
                     if (showSubPosts && post.sub_post_number > 0 && subPosts.isNotEmpty() && !immersiveMode) {
