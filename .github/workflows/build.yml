@@ -1,19 +1,24 @@
-name: Build, Deploy
+name: Build and Publish Android Release
 
 on:
   workflow_dispatch:
   push:
     branches:
-      - master
       - 4.0-dev
     tags:
-      - 'v*'
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   build:
+    name: Build arm64-v8a APK
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
 
     steps:
       - name: Checkout
@@ -22,112 +27,127 @@ jobs:
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
+          distribution: temurin
           java-version: "17"
-          distribution: "zulu"
-          cache: gradle
 
-      - name: Prepare Signing (optional)
-        env:
-          KEYSTORE_B64: ${{ secrets.KEYSTORE }}
-          RELEASE_STORE_PASSWORD: ${{ secrets.RELEASESTOREPASSWORD }}
-          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASEKEYPASSWORD }}
-          RELEASE_KEYSTORE: ${{ vars.RELEASE_KEYSTORE }}
-          RELEASE_KEY_ALIAS: ${{ vars.RELEASE_KEY_ALIAS }}
-        run: |
-          if [ -n "$KEYSTORE_B64" ] && [ -n "$RELEASE_STORE_PASSWORD" ] && [ -n "$RELEASE_KEY_PASSWORD" ] && [ -n "$RELEASE_KEYSTORE" ] && [ -n "$RELEASE_KEY_ALIAS" ]; then
-            printf "%s" "$KEYSTORE_B64" | base64 -d > "$RELEASE_KEYSTORE"
-            {
-              echo "keystore.file=$RELEASE_KEYSTORE"
-              echo "keystore.password=$RELEASE_STORE_PASSWORD"
-              echo "keystore.key.alias=$RELEASE_KEY_ALIAS"
-              echo "keystore.key.password=$RELEASE_KEY_PASSWORD"
-            } >> keystore.properties
-          else
-            echo "Signing secrets/vars not fully set. Skip signing setup."
-          fi
-
-      - name: Setup Gradle
+      - name: Set up Gradle and restore cache
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-home-cache-cleanup: true
-          cache-read-only: ${{ github.ref != 'refs/heads/master' && github.ref != 'refs/heads/4.0-dev' }}
 
-      - name: Build with Gradle
+      - name: Prepare release signing
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        shell: bash
         run: |
-          set -o pipefail
-          ./gradlew assembleRelease --stacktrace --info --warning-mode all --console=plain 2>&1 | tee gradle-build.log
+          set -euo pipefail
 
-      - name: Upload Gradle Log
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: gradle-build-log
-          path: gradle-build.log
+          test -n "$ANDROID_KEYSTORE_BASE64" || { echo "Missing ANDROID_KEYSTORE_BASE64" >&2; exit 1; }
+          test -n "$ANDROID_KEYSTORE_PASSWORD" || { echo "Missing ANDROID_KEYSTORE_PASSWORD" >&2; exit 1; }
+          test -n "$ANDROID_KEY_ALIAS" || { echo "Missing ANDROID_KEY_ALIAS" >&2; exit 1; }
+          test -n "$ANDROID_KEY_PASSWORD" || { echo "Missing ANDROID_KEY_PASSWORD" >&2; exit 1; }
 
-      - name: Parse Output Metadata
-        id: apk_meta
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > tieba-release.jks
+          cat > keystore.properties <<EOF
+          keystore.file=tieba-release.jks
+          keystore.password=$ANDROID_KEYSTORE_PASSWORD
+          keystore.key.alias=$ANDROID_KEY_ALIAS
+          keystore.key.password=$ANDROID_KEY_PASSWORD
+          EOF
+          chmod 600 tieba-release.jks keystore.properties
+
+          keytool -list \
+            -keystore tieba-release.jks \
+            -storepass "$ANDROID_KEYSTORE_PASSWORD" \
+            -alias "$ANDROID_KEY_ALIAS" \
+            >/dev/null
+
+      - name: Build release APK
+        shell: bash
+        run: ./gradlew assembleRelease --stacktrace --warning-mode all --console=plain
+
+      - name: Verify arm64-v8a output and collect metadata
+        id: apk
+        shell: bash
         run: |
-          python - <<'PY'
+          set -euo pipefail
+
+          metadata="app/build/outputs/apk/release/output-metadata.json"
+          test -f "$metadata" || { echo "Missing $metadata" >&2; exit 1; }
+
+          python3 - "$metadata" "$GITHUB_OUTPUT" <<'PY'
           import json
-          import os
+          import pathlib
           import sys
 
-          path = "./app/build/outputs/apk/release/output-metadata.json"
-          if not os.path.exists(path):
-              print("output-metadata.json missing", file=sys.stderr)
-              sys.exit(1)
-
-          with open(path, "r", encoding="utf-8") as f:
-              data = json.load(f)
-
+          metadata_path = pathlib.Path(sys.argv[1])
+          output_path = pathlib.Path(sys.argv[2])
+          data = json.loads(metadata_path.read_text(encoding="utf-8"))
           elements = data.get("elements") or []
-          if not elements:
-              print("output-metadata.json elements empty", file=sys.stderr)
-              sys.exit(1)
+          arm64 = [
+              item for item in elements
+              if any(filt.get("value") == "arm64-v8a" for filt in item.get("filters", []))
+          ]
+          if len(arm64) != 1:
+              raise SystemExit(f"Expected exactly one arm64-v8a APK, found {len(arm64)}")
 
-          elem = elements[0]
-          version_code = elem.get("versionCode", "")
-          version_name = elem.get("versionName", "")
+          element = arm64[0]
+          apk_path = pathlib.Path("app/build/outputs/apk/release") / element["outputFile"]
+          if not apk_path.is_file():
+              raise SystemExit(f"Missing APK: {apk_path}")
 
-          out_path = os.environ.get("GITHUB_OUTPUT")
-          if not out_path:
-              print("GITHUB_OUTPUT not set", file=sys.stderr)
-              sys.exit(1)
-
-          with open(out_path, "a", encoding="utf-8") as out:
-              out.write(f"version_code={version_code}\n")
-              out.write(f"version_name={version_name}\n")
+          with output_path.open("a", encoding="utf-8") as output:
+              output.write(f"apk_path={apk_path.as_posix()}\n")
+              output.write(f"version_code={element['versionCode']}\n")
+              output.write(f"version_name={element['versionName']}\n")
+          print(f"Verified {apk_path} ({apk_path.stat().st_size} bytes)")
           PY
 
-      - name: Upload Release Package
+      - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: "release-${{ steps.apk_meta.outputs.version_name }}(${{ steps.apk_meta.outputs.version_code }})"
-          path: ./app/build/outputs/apk/release
+          name: tieba-lite-${{ steps.apk.outputs.version_name }}-${{ steps.apk.outputs.version_code }}-arm64-v8a
+          path: ${{ steps.apk.outputs.apk_path }}
+          if-no-files-found: error
 
-#      - name: Upload Mapping
-#        uses: actions/upload-artifact@v4
-#        with:
-#          name: mapping
-#          path: ./app/build/outputs/mapping/release
-#
-#      - name: Post to channel
-#        if: contains(github.event.head_commit.message, '[skip post]') == false && github.event_name != 'pull_request'
-#        env:
-#          CHANNEL_ID: ${{ secrets.CHANNEL_DEV_ID }}
-#          BOT_TOKEN: ${{ secrets.BOT_DEV_TOKEN }}
-#          COMMIT_URL: ${{ github.event.head_commit.url }}
-#          COMMIT_MESSAGE: |+
-#            ```
-#            ${{ github.event.head_commit.message }}
-#            ```
-#
-#            构建分支：[${{ github.ref }}](${{ github.server_url }}/${{ github.repository }}/tree/${{ github.ref_name }})
-#            构建版本：[${{ github.sha }}]("$COMMIT_URL")
-#          ACTION_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-#        run: |
-#          if [ -n "$BOT_TOKEN" ] && [ -n "$CHANNEL_ID" ]; then
-#            export RELEASE=$(find ./app/build/outputs/apk/release -name "*.apk")
-#            ESCAPED=`python3 -c 'import json,os,urllib.parse; msg = json.dumps(os.environ["COMMIT_MESSAGE"]); print(urllib.parse.quote(msg if len(msg) <= 1024 else json.dumps(os.environ["COMMIT_URL"])))'`
-#            curl -v "https://api.telegram.org/bot${BOT_TOKEN}/sendMediaGroup?chat_id=${CHANNEL_ID}&media=%5B%7B%22type%22%3A%22document%22%2C%22media%22%3A%22attach%3A%2F%2Frelease%22%2C%22parse_mode%22%3A%22MarkdownV2%22%2C%22caption%22%3A${ESCAPED}%7D%5D&reply_markup=%7B%22inline_keyboard%22%3A%20%5B%5B%7B%22text%22%3A%20%22%E5%9C%A8+Github+%E4%B8%8A%E6%9F%A5%E7%9C%8B%22%2C%20%22url%22%3A%20${ACTION_URL}%7D%5D%5D%7D" -F release="@$RELEASE"
-#          fi
+      - name: Compute Release metadata
+        id: release
+        env:
+          VERSION_NAME: ${{ steps.apk.outputs.version_name }}
+          VERSION_CODE: ${{ steps.apk.outputs.version_code }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            tag="${GITHUB_REF#refs/tags/}"
+            name="TiebaLite ${VERSION_NAME} (${VERSION_CODE})"
+            if [[ "$tag" == *-* ]]; then
+              prerelease=true
+            else
+              prerelease=false
+            fi
+          else
+            tag="ci-${VERSION_CODE}-${GITHUB_RUN_NUMBER}"
+            name="TiebaLite ${VERSION_NAME} (${VERSION_CODE}) CI #${GITHUB_RUN_NUMBER}"
+            prerelease=true
+          fi
+
+          {
+            echo "tag=$tag"
+            echo "name=$name"
+            echo "prerelease=$prerelease"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Publish APK to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release.outputs.tag }}
+          name: ${{ steps.release.outputs.name }}
+          prerelease: ${{ steps.release.outputs.prerelease }}
+          generate_release_notes: true
+          target_commitish: ${{ github.sha }}
+          files: ${{ steps.apk.outputs.apk_path }}
