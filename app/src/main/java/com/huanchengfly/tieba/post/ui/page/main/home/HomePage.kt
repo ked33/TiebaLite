@@ -10,7 +10,8 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -22,7 +23,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.items
@@ -49,6 +50,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Alignment.Companion.Center
@@ -63,6 +65,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -185,6 +188,93 @@ private fun Header(
             .then(modifier),
         invertColor = invert
     )
+}
+
+@Composable
+private fun CollapsibleSectionHeader(
+    title: String,
+    itemCount: Int,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val rotate by animateFloatAsState(
+        targetValue = if (expanded) 90f else 0f,
+        label = "sectionIndicatorRotation"
+    )
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onToggle
+            )
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = CenterVertically,
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.subtitle1,
+            fontWeight = FontWeight.Bold,
+            color = ExtendedTheme.colors.text,
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = stringResource(id = R.string.text_forum_count, itemCount),
+            style = MaterialTheme.typography.caption,
+            color = ExtendedTheme.colors.textSecondary,
+        )
+        Spacer(modifier = Modifier.weight(1f))
+        Icon(
+            imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+            contentDescription = stringResource(
+                id = if (expanded) {
+                    R.string.desc_collapse_section
+                } else {
+                    R.string.desc_expand_section
+                }
+            ),
+            tint = ExtendedTheme.colors.textSecondary,
+            modifier = Modifier
+                .size(24.dp)
+                .rotate(rotate),
+        )
+    }
+}
+
+@Composable
+private fun HistoryForumItem(
+    title: String,
+    avatar: String?,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .height(42.dp)
+            .widthIn(min = 112.dp, max = 200.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .background(color = ExtendedTheme.colors.chip)
+            .debounceClickable(onClick = onClick)
+            .padding(horizontal = 10.dp),
+        verticalAlignment = CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Avatar(
+            data = avatar,
+            contentDescription = null,
+            size = 28.dp,
+            shape = CircleShape,
+        )
+        Text(
+            text = title,
+            style = MaterialTheme.typography.body2,
+            fontWeight = FontWeight.Medium,
+            color = ExtendedTheme.colors.text,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
 }
 
 @Composable
@@ -419,7 +509,7 @@ private fun ForumItem(
     }
 }
 
-@OptIn(ExperimentalMaterialApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterialApi::class)
 @Composable
 fun HomePage(
     viewModel: HomeViewModel = pageViewModel(),
@@ -465,6 +555,7 @@ fun HomePage(
     val hasTopForum by remember { derivedStateOf { topForums.isNotEmpty() } }
     val showHistoryForum by remember { derivedStateOf { context.appPreferences.homePageShowHistoryForum && historyForums.isNotEmpty() } }
     var listSingle by remember { mutableStateOf(context.appPreferences.listSingle) }
+    var expandFollowedForums by rememberSaveable { mutableStateOf(true) }
     val isError by remember { derivedStateOf { error != null } }
     val gridCells by remember { derivedStateOf { getGridCells(context, listSingle) } }
 
@@ -568,86 +659,36 @@ fun HomePage(
                     ) {
                         if (showHistoryForum) {
                             item(key = "HistoryForums", span = { GridItemSpan(maxLineSpan) }) {
-                                val rotate by animateFloatAsState(
-                                    targetValue = if (expandHistoryForum) 90f else 0f,
-                                    label = "rotate"
-                                )
                                 Column {
-                                    Row(
-                                        verticalAlignment = CenterVertically,
-                                        modifier = Modifier
-                                            .clickable(
-                                                interactionSource = remember { MutableInteractionSource() },
-                                                indication = null
-                                            ) {
-                                                viewModel.send(
-                                                    HomeUiIntent.ToggleHistory(
-                                                        expandHistoryForum
-                                                    )
-                                                )
-                                            }
-                                            .padding(vertical = 8.dp)
-                                            .padding(end = 16.dp)
-                                    ) {
-                                        Header(
-                                            text = stringResource(id = R.string.title_history_forum),
-                                            invert = false
-                                        )
-
-                                        Spacer(modifier = Modifier.weight(1f))
-
-                                        Icon(
-                                            imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
-                                            contentDescription = stringResource(id = R.string.desc_show),
-                                            modifier = Modifier
-                                                .size(24.dp)
-                                                .rotate(rotate)
-                                        )
-                                    }
+                                    CollapsibleSectionHeader(
+                                        title = stringResource(id = R.string.title_history_forum),
+                                        itemCount = historyForums.size,
+                                        expanded = expandHistoryForum,
+                                        onToggle = {
+                                            viewModel.send(
+                                                HomeUiIntent.ToggleHistory(expandHistoryForum)
+                                            )
+                                        }
+                                    )
                                     AnimatedVisibility(visible = expandHistoryForum) {
-                                        LazyRow(
-                                            contentPadding = PaddingValues(bottom = 8.dp),
+                                        FlowRow(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(horizontal = 16.dp)
+                                                .padding(bottom = 12.dp),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                            verticalArrangement = Arrangement.spacedBy(8.dp),
                                         ) {
-                                            item(key = "Spacer1") {
-                                                Spacer(modifier = Modifier.width(12.dp))
-                                            }
-                                            items(
-                                                historyForums,
-                                                key = { it.data }
-                                            ) {
-                                                Row(
-                                                    modifier = Modifier
-                                                        .padding(horizontal = 4.dp)
-                                                        .height(IntrinsicSize.Min)
-                                                        .clip(RoundedCornerShape(100))
-                                                        .background(color = ExtendedTheme.colors.chip)
-                                                        .debounceClickable(onClick = {
-                                                            navigator.navigate(
-                                                                ForumPageDestination(
-                                                                    it.data
-                                                                )
-                                                            )
-                                                        })
-                                                        .padding(4.dp),
-                                                    verticalAlignment = CenterVertically,
-                                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                                ) {
-                                                    Avatar(
-                                                        data = it.avatar,
-                                                        contentDescription = null,
-                                                        size = 24.dp,
-                                                        shape = CircleShape
-                                                    )
-                                                    Text(
-                                                        text = it.title,
-                                                        fontSize = 12.sp,
-                                                        fontWeight = FontWeight.Bold,
-                                                        modifier = Modifier.padding(end = 4.dp)
-                                                    )
-                                                }
-                                            }
-                                            item(key = "Spacer2") {
-                                                Spacer(modifier = Modifier.width(12.dp))
+                                            historyForums.forEach { forum ->
+                                                HistoryForumItem(
+                                                    title = forum.title,
+                                                    avatar = forum.avatar,
+                                                    onClick = {
+                                                        navigator.navigate(
+                                                            ForumPageDestination(forum.data)
+                                                        )
+                                                    }
+                                                )
                                             }
                                         }
                                     }
@@ -689,36 +730,39 @@ fun HomePage(
                                 )
                             }
                         }
-                        if (showHistoryForum || hasTopForum) {
-                            item(key = "ForumHeader", span = { GridItemSpan(maxLineSpan) }) {
-                                Column(
-                                    modifier = Modifier.padding(vertical = 8.dp)
-                                ) {
-                                    Header(text = stringResource(id = R.string.forum_list_title))
-                                }
-                            }
-                        }
-                        items(
-                            items = forums,
-                            key = { it.forumId }
-                        ) { item ->
-                            ForumItem(
-                                item,
-                                listSingle,
-                                onClick = {
-                                    navigator.navigate(ForumPageDestination(it.forumName))
-                                },
-                                onUnfollow = {
-                                    unfollowForum = it
-                                    confirmUnfollowDialog.show()
-                                },
-                                onAddTopForum = {
-                                    viewModel.send(HomeUiIntent.TopForums.Add(it))
-                                },
-                                onDeleteTopForum = {
-                                    viewModel.send(HomeUiIntent.TopForums.Delete(it.forumId))
+                        item(key = "ForumHeader", span = { GridItemSpan(maxLineSpan) }) {
+                            CollapsibleSectionHeader(
+                                title = stringResource(id = R.string.forum_list_title),
+                                itemCount = forums.size,
+                                expanded = expandFollowedForums,
+                                onToggle = {
+                                    expandFollowedForums = !expandFollowedForums
                                 }
                             )
+                        }
+                        if (expandFollowedForums) {
+                            items(
+                                items = forums,
+                                key = { it.forumId }
+                            ) { item ->
+                                ForumItem(
+                                    item,
+                                    listSingle,
+                                    onClick = {
+                                        navigator.navigate(ForumPageDestination(it.forumName))
+                                    },
+                                    onUnfollow = {
+                                        unfollowForum = it
+                                        confirmUnfollowDialog.show()
+                                    },
+                                    onAddTopForum = {
+                                        viewModel.send(HomeUiIntent.TopForums.Add(it))
+                                    },
+                                    onDeleteTopForum = {
+                                        viewModel.send(HomeUiIntent.TopForums.Delete(it.forumId))
+                                    }
+                                )
+                            }
                         }
                     }
                 }

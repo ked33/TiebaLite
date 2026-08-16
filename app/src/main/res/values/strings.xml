@@ -252,6 +252,7 @@
     <string name="title_history_before">昨天或更早</string>
     <string name="title_history_thread">贴子记录</string>
     <string name="title_history_forum">经过贴吧</string>
+    <string name="text_forum_count">%1$d 个</string>
     <string name="title_thread_header">回复 %1$s</string>
     <string name="title_oksign_slow_mode">慢速模式</string>
     <string name="summary_oksign_slow_mode">开启后，一键签到时签到每个吧的时间间隔将会更长</string>
@@ -554,6 +555,8 @@
     <string name="summary_do_not_use_photo_picker">将使用 App 内置的照片选择器</string>
     <string name="summary_use_photo_picker">将使用原生的照片选择器</string>
     <string name="desc_show">显示</string>
+    <string name="desc_expand_section">展开分区</string>
+    <string name="desc_collapse_section">收起分区</string>
     <string name="title_settings_status_bar_darker">状态栏遮罩</string>
     <string name="summary_settings_status_bar_darker">开启后非白色主题状态栏将略微变暗</string>
     <string name="desc_input_color">手动输入颜色</string>
