@@ -177,6 +177,7 @@ private fun ForumToolbarTitle(
     forumName: String,
     forumInfoImmutableHolder: ImmutableHolder<ForumInfo>?,
     onOpenForumInfo: () -> Unit,
+    accountAction: @Composable () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val forum = forumInfoImmutableHolder?.get()
@@ -192,9 +193,9 @@ private fun ForumToolbarTitle(
         modifier.fillMaxWidth()
     }
 
-    Column(
+    Row(
         modifier = titleModifier,
-        verticalArrangement = Arrangement.spacedBy(1.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             text = stringResource(id = R.string.title_forum, forumName),
@@ -202,36 +203,45 @@ private fun ForumToolbarTitle(
             fontWeight = FontWeight.Bold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
         )
         if (forum?.is_like == 1) {
-            Text(
-                text = stringResource(
-                    id = R.string.tip_forum_header_liked,
-                    forum.user_level.toString(),
-                    forum.level_name,
-                ),
-                style = MaterialTheme.typography.caption,
-                color = ExtendedTheme.colors.onTopBarSecondary,
-                fontSize = 9.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            LinearProgressIndicator(
-                progress = max(
-                    0F,
-                    min(
-                        1F,
-                        forum.cur_score * 1.0F / max(1.0F, forum.levelup_score * 1.0F),
-                    ),
-                ),
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(4.dp)
-                    .clip(RoundedCornerShape(100)),
-                color = ExtendedTheme.colors.primary,
-                backgroundColor = ExtendedTheme.colors.onTopBar.copy(alpha = 0.16f),
+                    .weight(1f)
+                    .padding(start = 6.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(
+                    text = stringResource(
+                        id = R.string.tip_forum_header_liked,
+                        forum.user_level.toString(),
+                        forum.level_name,
+                    ),
+                    style = MaterialTheme.typography.caption,
+                    color = ExtendedTheme.colors.onTopBarSecondary,
+                    fontSize = 9.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                LinearProgressIndicator(
+                    progress = max(
+                        0F,
+                        min(
+                            1F,
+                            forum.cur_score * 1.0F / max(1.0F, forum.levelup_score * 1.0F),
+                        ),
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(4.dp)
+                        .clip(RoundedCornerShape(100)),
+                    color = ExtendedTheme.colors.primary,
+                    backgroundColor = ExtendedTheme.colors.onTopBar.copy(alpha = 0.16f),
+                )
             )
         }
+        accountAction()
     }
 }
 
@@ -239,6 +249,7 @@ private fun ForumToolbarTitle(
 private fun ForumToolbarAccountAction(
     forumInfoImmutableHolder: ImmutableHolder<ForumInfo>?,
     onBtnClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val forum = forumInfoImmutableHolder?.get() ?: return
     if (LocalAccount.current == null) return
@@ -247,8 +258,7 @@ private fun ForumToolbarAccountAction(
         (forum.is_like != 1) || (forum.sign_in_info?.user_info?.is_sign_in != 1)
     Button(
         onClick = onBtnClick,
-        modifier = Modifier
-            .padding(end = 4.dp)
+        modifier = modifier
             .height(36.dp),
         elevation = null,
         shape = RoundedCornerShape(100),
@@ -1063,6 +1073,13 @@ private fun ForumToolbar(
                 forumName = forumName,
                 forumInfoImmutableHolder = forumInfoImmutableHolder,
                 onOpenForumInfo = onOpenForumInfo,
+                accountAction = {
+                    ForumToolbarAccountAction(
+                        forumInfoImmutableHolder = forumInfoImmutableHolder,
+                        onBtnClick = onBtnClick,
+                        modifier = Modifier.padding(end = 52.dp),
+                    )
+                },
             )
         },
         navigationIcon = {
@@ -1072,10 +1089,6 @@ private fun ForumToolbar(
             })
         },
         actions = {
-            ForumToolbarAccountAction(
-                forumInfoImmutableHolder = forumInfoImmutableHolder,
-                onBtnClick = onBtnClick,
-            )
             if (forumId != null) {
                 var lastClickTime by remember { mutableLongStateOf(0L) }
                 IconButton(
