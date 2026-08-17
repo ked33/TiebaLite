@@ -23,7 +23,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.flatMapConcat
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.onStart
@@ -79,8 +78,6 @@ class ForumViewModel @Inject constructor() :
                     .flatMapConcat { it.produceLoadPartialChange() },
                 intentFlow.filterIsInstance<ForumUiIntent.Unlike>()
                     .flatMapConcat { it.produceLoadPartialChange() },
-                intentFlow.filterIsInstance<ForumUiIntent.ToggleShowHeader>()
-                    .flatMapConcat { it.produceLoadPartialChange() },
             )
 
         private fun ForumUiIntent.Load.produceLoadPartialChange() =
@@ -134,9 +131,6 @@ class ForumViewModel @Inject constructor() :
                     ForumPartialChange.Unlike.Success
                 }
                 .catch { emit(ForumPartialChange.Unlike.Failure(it)) }
-
-        private fun ForumUiIntent.ToggleShowHeader.produceLoadPartialChange() =
-            flowOf(ForumPartialChange.ToggleShowHeader(showHeader))
     }
 }
 
@@ -162,10 +156,6 @@ sealed interface ForumUiIntent : UiIntent {
         val forumId: Long,
         val forumName: String,
         val tbs: String
-    ) : ForumUiIntent
-
-    data class ToggleShowHeader(
-        val showHeader: Boolean
     ) : ForumUiIntent
 }
 
@@ -268,11 +258,6 @@ sealed interface ForumPartialChange : PartialChange<ForumUiState> {
 
         data class Failure(val error: Throwable) : Unlike()
     }
-
-    data class ToggleShowHeader(val showHeader: Boolean) : ForumPartialChange {
-        override fun reduce(oldState: ForumUiState): ForumUiState =
-            oldState.copy(showForumHeader = showHeader)
-    }
 }
 
 data class ForumUiState(
@@ -280,7 +265,6 @@ data class ForumUiState(
     val isError: Boolean = false,
     val forum: ImmutableHolder<ForumInfo>? = null,
     val tbs: String? = null,
-    val showForumHeader: Boolean = true,
     val navTabInfo: NavTabInfo? = null,
 ) : UiState
 
