@@ -32,6 +32,9 @@ interface HistoryDao {
     @Query("DELETE FROM history WHERE id = :id")
     suspend fun deleteById(id: Long)
 
+    @Query("UPDATE history SET isPinned = :isPinned WHERE id = :id")
+    suspend fun setPinned(id: Long, isPinned: Boolean)
+
     @Query("DELETE FROM history")
     suspend fun deleteAll()
 
@@ -48,6 +51,7 @@ interface HistoryDao {
                     avatar = history.avatar,
                     username = history.username,
                     count = existing.count + 1,
+                    isPinned = existing.isPinned,
                 )
             )
         } else {

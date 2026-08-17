@@ -15,6 +15,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.MaterialTheme
+import androidx.compose.material.LinearProgressIndicator
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
@@ -55,11 +56,17 @@ import com.huanchengfly.tieba.post.ui.widgets.compose.states.StateScreen
 import com.huanchengfly.tieba.post.utils.StringUtil.getShortNumString
 import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
+import kotlin.math.max
+import kotlin.math.min
 
 @Destination
 @Composable
 fun ForumDetailPage(
     forumId: Long,
+    userLevel: Int? = null,
+    levelName: String? = null,
+    currentScore: Int? = null,
+    levelUpScore: Int? = null,
     navigator: DestinationsNavigator,
     viewModel: ForumDetailViewModel = pageViewModel(),
 ) {
@@ -118,6 +125,10 @@ fun ForumDetailPage(
                 forumInfo?.let {
                     ForumDetailContent(
                         forumInfo = it,
+                        userLevel = userLevel,
+                        levelName = levelName,
+                        currentScore = currentScore,
+                        levelUpScore = levelUpScore,
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -129,6 +140,10 @@ fun ForumDetailPage(
 @Composable
 private fun ForumDetailContent(
     forumInfo: ImmutableHolder<RecommendForumInfo>,
+    userLevel: Int? = null,
+    levelName: String? = null,
+    currentScore: Int? = null,
+    levelUpScore: Int? = null,
     modifier: Modifier = Modifier,
 ) {
     val intro = remember(forumInfo) {
@@ -170,6 +185,40 @@ private fun ForumDetailContent(
                 statNum = forumInfo.get { thread_count },
                 statText = stringResource(id = R.string.text_stat_threads)
             )
+        }
+        userLevel?.let { level ->
+            Column(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(color = ExtendedTheme.colors.chip)
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    text = stringResource(
+                        id = R.string.tip_forum_header_liked,
+                        level,
+                        levelName.orEmpty(),
+                    ),
+                    style = MaterialTheme.typography.body2,
+                )
+                LinearProgressIndicator(
+                    progress = max(
+                        0F,
+                        min(
+                            1F,
+                            (currentScore ?: 0) * 1.0F /
+                                max(1.0F, (levelUpScore ?: 1) * 1.0F),
+                        ),
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(4.dp)
+                        .clip(RoundedCornerShape(100)),
+                    color = ExtendedTheme.colors.primary,
+                    backgroundColor = ExtendedTheme.colors.onChip.copy(alpha = 0.16f),
+                )
+            }
         }
         Column(
             verticalArrangement = Arrangement.spacedBy(8.dp)

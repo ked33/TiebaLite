@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -141,6 +142,7 @@ fun MainPage(
         pageCount = { pageCount },
         initialPage = if (hideExplore && defaultStart > 0) defaultStart - 1 else defaultStart
     )
+    val homeForumGridState = rememberLazyGridState()
 
     LaunchedEffect(hideExplore) {
         if (pagerState.currentPage == 3 && hideExplore) {
@@ -165,7 +167,7 @@ fun MainPage(
                         HomePage(
                             viewModel = homeViewModel,
                             canOpenExplore = !LocalContext.current.appPreferences.hideExplore,
-                            isSelected = pagerState.currentPage == 0,
+                            forumGridState = homeForumGridState,
                         ) {
                             coroutineScope.launch {
                                 pagerState.scrollToPage(1)

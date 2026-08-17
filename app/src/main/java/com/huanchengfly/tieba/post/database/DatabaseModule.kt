@@ -19,6 +19,10 @@ private val MIGRATION_39_40 = Migration(39, 40) { db ->
     db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_draft_hash` ON `draft` (`hash`)")
 }
 
+private val MIGRATION_40_41 = Migration(40, 41) { db ->
+    db.execSQL("ALTER TABLE `history` ADD COLUMN `isPinned` INTEGER NOT NULL DEFAULT 0")
+}
+
 private val MIGRATION_38_39 = Migration(38, 39) { db ->
     // 1. 重建 account 表
     db.execSQL("ALTER TABLE `account` RENAME TO `account_old`")
@@ -70,7 +74,7 @@ object DatabaseModule {
     @Singleton
     fun provideAppDatabase(@ApplicationContext context: Context): AppDatabase {
         return Room.databaseBuilder(context, AppDatabase::class.java, "tblite.db")
-            .addMigrations(MIGRATION_38_39, MIGRATION_39_40)
+            .addMigrations(MIGRATION_38_39, MIGRATION_39_40, MIGRATION_40_41)
             .build()
     }
 

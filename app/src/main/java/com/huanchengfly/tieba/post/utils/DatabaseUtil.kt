@@ -49,6 +49,9 @@ object DatabaseUtil {
 
     suspend fun deleteHistoryById(id: Long) = appDatabase.historyDao().deleteById(id)
 
+    suspend fun setHistoryPinned(id: Long, isPinned: Boolean) =
+        appDatabase.historyDao().setPinned(id, isPinned)
+
     suspend fun deleteAllHistory() = appDatabase.historyDao().deleteAll()
 
     // ── Block ───────────────────────────────────────────────────

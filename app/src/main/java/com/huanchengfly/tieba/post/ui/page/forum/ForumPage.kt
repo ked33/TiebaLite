@@ -28,7 +28,6 @@ import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.FloatingActionButton
 import androidx.compose.material.Icon
 import androidx.compose.material.IconButton
-import androidx.compose.material.LinearProgressIndicator
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Tab
 import androidx.compose.material.Text
@@ -129,8 +128,6 @@ import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
-import kotlin.math.max
-import kotlin.math.min
 
 
 private val LoadDistance = 70.dp
@@ -177,11 +174,9 @@ private fun ForumToolbarTitle(
     forumName: String,
     forumInfoImmutableHolder: ImmutableHolder<ForumInfo>?,
     onOpenForumInfo: () -> Unit,
-    accountAction: @Composable () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val forum = forumInfoImmutableHolder?.get()
-    val titleModifier = if (forum != null) {
+    val titleModifier = if (forumInfoImmutableHolder != null) {
         modifier
             .fillMaxWidth()
             .debounceClickable(
@@ -193,72 +188,29 @@ private fun ForumToolbarTitle(
         modifier.fillMaxWidth()
     }
 
-    Row(
+    Text(
+        text = forumName.removeSuffix("吧"),
         modifier = titleModifier,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = stringResource(id = R.string.title_forum, forumName),
-            fontSize = 17.sp,
-            fontWeight = FontWeight.Bold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
-        )
-        if (forum?.is_like == 1) {
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(start = 6.dp),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                Text(
-                    text = stringResource(
-                        id = R.string.tip_forum_header_liked,
-                        forum.user_level.toString(),
-                        forum.level_name,
-                    ),
-                    style = MaterialTheme.typography.caption,
-                    color = ExtendedTheme.colors.onTopBarSecondary,
-                    fontSize = 9.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                LinearProgressIndicator(
-                    progress = max(
-                        0F,
-                        min(
-                            1F,
-                            forum.cur_score * 1.0F / max(1.0F, forum.levelup_score * 1.0F),
-                        ),
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(4.dp)
-                        .clip(RoundedCornerShape(100)),
-                    color = ExtendedTheme.colors.primary,
-                    backgroundColor = ExtendedTheme.colors.onTopBar.copy(alpha = 0.16f),
-                )
-            }
-        }
-        accountAction()
-    }
+        fontSize = 17.sp,
+        fontWeight = FontWeight.Bold,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
 }
 
 @Composable
-private fun ForumToolbarAccountAction(
+private fun ForumToolbarFollowAction(
     forumInfoImmutableHolder: ImmutableHolder<ForumInfo>?,
     onBtnClick: () -> Unit,
-    modifier: Modifier = Modifier,
 ) {
     val forum = forumInfoImmutableHolder?.get() ?: return
     if (LocalAccount.current == null) return
+    if (forum.is_like == 1) return
 
-    val btnEnabled =
-        (forum.is_like != 1) || (forum.sign_in_info?.user_info?.is_sign_in != 1)
     Button(
         onClick = onBtnClick,
-        modifier = modifier
+        modifier = Modifier
+            .padding(end = 4.dp)
             .height(36.dp),
         elevation = null,
         shape = RoundedCornerShape(100),
@@ -269,18 +221,41 @@ private fun ForumToolbarAccountAction(
             disabledContentColor = ExtendedTheme.colors.onTopBarSecondary,
         ),
         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 5.dp),
-        enabled = btnEnabled,
     ) {
-        val text = when {
-            forum.is_like != 1 -> stringResource(id = R.string.button_follow)
-            forum.sign_in_info?.user_info?.is_sign_in == 1 -> stringResource(
-                id = R.string.button_signed_in,
-                forum.sign_in_info.user_info.cont_sign_num,
-            )
+        Text(
+            text = stringResource(id = R.string.button_follow),
+            fontSize = 11.sp,
+            maxLines = 1,
+        )
+    }
+}
 
-            else -> stringResource(id = R.string.button_sign_in)
-        }
-        Text(text = text, fontSize = 11.sp, maxLines = 1)
+@Composable
+private fun MenuScope.ForumToolbarSignInMenuItem(
+    forumInfoImmutableHolder: ImmutableHolder<ForumInfo>?,
+    onBtnClick: () -> Unit,
+) {
+    val forum = forumInfoImmutableHolder?.get() ?: return
+    if (LocalAccount.current == null || forum.is_like != 1) return
+
+    val isSignedIn = forum.sign_in_info?.user_info?.is_sign_in == 1
+    DropdownMenuItem(
+        onClick = {
+            onBtnClick()
+            dismiss()
+        },
+        enabled = !isSignedIn,
+    ) {
+        Text(
+            text = if (isSignedIn) {
+                stringResource(
+                    id = R.string.button_signed_in,
+                    forum.sign_in_info?.user_info?.cont_sign_num ?: 0,
+                )
+            } else {
+                stringResource(id = R.string.button_sign_in)
+            }
+        )
     }
 }
 
@@ -556,9 +531,14 @@ fun ForumPage(
                         forumInfoImmutableHolder = forumInfo,
                         onOpenForumInfo = {
                             forumInfo?.let { holder ->
+                                val forum = holder.get()
                                 navigator.navigate(
                                     ForumDetailPageDestination(
-                                        forumId = holder.get { id }
+                                        forumId = forum.id,
+                                        userLevel = forum.user_level.takeIf { forum.is_like == 1 },
+                                        levelName = forum.level_name.takeIf { forum.is_like == 1 },
+                                        currentScore = forum.cur_score.takeIf { forum.is_like == 1 },
+                                        levelUpScore = forum.levelup_score.takeIf { forum.is_like == 1 },
                                     )
                                 )
                             }
@@ -1073,13 +1053,6 @@ private fun ForumToolbar(
                 forumName = forumName,
                 forumInfoImmutableHolder = forumInfoImmutableHolder,
                 onOpenForumInfo = onOpenForumInfo,
-                accountAction = {
-                    ForumToolbarAccountAction(
-                        forumInfoImmutableHolder = forumInfoImmutableHolder,
-                        onBtnClick = onBtnClick,
-                        modifier = Modifier.padding(end = 52.dp),
-                    )
-                },
             )
         },
         navigationIcon = {
@@ -1089,6 +1062,10 @@ private fun ForumToolbar(
             })
         },
         actions = {
+            ForumToolbarFollowAction(
+                forumInfoImmutableHolder = forumInfoImmutableHolder,
+                onBtnClick = onBtnClick,
+            )
             if (forumId != null) {
                 var lastClickTime by remember { mutableLongStateOf(0L) }
                 IconButton(
@@ -1111,7 +1088,13 @@ private fun ForumToolbar(
                 if (menuContent != null) {
                     val menuState = rememberMenuState()
                     ClickMenu(
-                        menuContent = menuContent,
+                        menuContent = {
+                            ForumToolbarSignInMenuItem(
+                                forumInfoImmutableHolder = forumInfoImmutableHolder,
+                                onBtnClick = onBtnClick,
+                            )
+                            menuContent?.invoke(this)
+                        },
                         menuState = menuState,
                         triggerShape = CircleShape
                     ) {

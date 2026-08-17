@@ -47,6 +47,7 @@ class HomeViewModel : BaseViewModel<HomeUiIntent, HomePartialChange, HomeUiState
         when (partialChange) {
             is HomePartialChange.TopForums.Delete.Failure -> CommonUiEvent.Toast(partialChange.errorMessage)
             is HomePartialChange.TopForums.Add.Failure -> CommonUiEvent.Toast(partialChange.errorMessage)
+            is HomePartialChange.HistoryOperation.Failure -> CommonUiEvent.Toast(partialChange.errorMessage)
             else -> null
         }
 
@@ -66,7 +67,11 @@ class HomeViewModel : BaseViewModel<HomeUiIntent, HomePartialChange, HomeUiState
                 intentFlow.filterIsInstance<HomeUiIntent.Unfollow>()
                     .flatMapConcat { it.toPartialChangeFlow() },
                 intentFlow.filterIsInstance<HomeUiIntent.ToggleHistory>()
-                    .flatMapConcat { it.toPartialChangeFlow() }
+                    .flatMapConcat { it.toPartialChangeFlow() },
+                intentFlow.filterIsInstance<HomeUiIntent.SetHistoryPinned>()
+                    .flatMapConcat { it.toPartialChangeFlow() },
+                intentFlow.filterIsInstance<HomeUiIntent.DeleteHistory>()
+                    .flatMapConcat { it.toPartialChangeFlow() },
             )
         }
 
@@ -133,6 +138,20 @@ class HomeViewModel : BaseViewModel<HomeUiIntent, HomePartialChange, HomeUiState
 
         private fun HomeUiIntent.ToggleHistory.toPartialChangeFlow() =
             flowOf(HomePartialChange.ToggleHistory(!currentExpand))
+
+        private fun HomeUiIntent.SetHistoryPinned.toPartialChangeFlow() =
+            flow<HomePartialChange.HistoryOperation> {
+                DatabaseUtil.setHistoryPinned(historyId, isPinned)
+                emit(HomePartialChange.HistoryOperation.Success)
+            }.flowOn(Dispatchers.IO)
+                .catch { emit(HomePartialChange.HistoryOperation.Failure(it.getErrorMessage())) }
+
+        private fun HomeUiIntent.DeleteHistory.toPartialChangeFlow() =
+            flow<HomePartialChange.HistoryOperation> {
+                DatabaseUtil.deleteHistoryById(historyId)
+                emit(HomePartialChange.HistoryOperation.Success)
+            }.flowOn(Dispatchers.IO)
+                .catch { emit(HomePartialChange.HistoryOperation.Failure(it.getErrorMessage())) }
     }
 }
 
@@ -150,9 +169,21 @@ sealed interface HomeUiIntent : UiIntent {
     }
 
     data class ToggleHistory(val currentExpand: Boolean) : HomeUiIntent
+
+    data class SetHistoryPinned(val historyId: Long, val isPinned: Boolean) : HomeUiIntent
+
+    data class DeleteHistory(val historyId: Long) : HomeUiIntent
 }
 
 sealed interface HomePartialChange : PartialChange<HomeUiState> {
+    sealed class HistoryOperation : HomePartialChange {
+        override fun reduce(oldState: HomeUiState): HomeUiState = oldState
+
+        data object Success : HistoryOperation()
+
+        data class Failure(val errorMessage: String) : HistoryOperation()
+    }
+
     sealed class Unfollow : HomePartialChange {
         override fun reduce(oldState: HomeUiState): HomeUiState =
             when (this) {

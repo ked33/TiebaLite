@@ -16,4 +16,5 @@ data class History(
     val extras: String? = null,
     val avatar: String? = null,
     val username: String? = null,
+    val isPinned: Boolean = false,
 )

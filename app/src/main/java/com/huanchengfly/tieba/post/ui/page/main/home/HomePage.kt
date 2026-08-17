@@ -1,6 +1,5 @@
 package com.huanchengfly.tieba.post.ui.page.main.home
 
-import android.content.Context
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
@@ -23,8 +22,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -110,16 +109,21 @@ import com.huanchengfly.tieba.post.utils.TiebaUtil
 import com.huanchengfly.tieba.post.utils.appPreferences
 import kotlinx.collections.immutable.persistentListOf
 
-private fun getGridCells(
-    context: Context,
-    listSingle: Boolean = context.appPreferences.listSingle
-): GridCells {
-    return if (listSingle) {
-        GridCells.Fixed(1)
-    } else {
-        GridCells.Adaptive(180.dp)
+private enum class ForumListLayout(val columns: Int) {
+    Single(1),
+    Double(2),
+    Quad(4),
+    ;
+
+    fun next(): ForumListLayout = entries[(ordinal + 1) % entries.size]
+
+    companion object {
+        fun fromPreference(value: Int, legacyListSingle: Boolean): ForumListLayout =
+            entries.getOrNull(value) ?: if (legacyListSingle) Single else Double
     }
 }
+
+private fun getGridCells(layout: ForumListLayout): GridCells = GridCells.Fixed(layout.columns)
 
 @Preview("SearchBoxPreview")
 @Composable
@@ -243,9 +247,8 @@ private fun CollapsibleSectionHeader(
 }
 
 @Composable
-private fun HistoryForumItem(
+private fun ForumLabel(
     title: String,
-    onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Box(
@@ -254,7 +257,6 @@ private fun HistoryForumItem(
             .fillMaxWidth()
             .clip(RoundedCornerShape(6.dp))
             .background(color = ExtendedTheme.colors.chip)
-            .debounceClickable(onClick = onClick)
             .padding(horizontal = 6.dp),
         contentAlignment = Center,
     ) {
@@ -267,6 +269,59 @@ private fun HistoryForumItem(
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center,
         )
+    }
+}
+
+@Composable
+private fun CompactForumItem(
+    title: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    ForumLabel(
+        title = title,
+        modifier = modifier.debounceClickable(onClick = onClick),
+    )
+}
+
+@Composable
+private fun HistoryForumItem(
+    history: History,
+    onClick: () -> Unit,
+    onTogglePinned: () -> Unit,
+    onRemove: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val menuState = rememberMenuState()
+    LongClickMenu(
+        menuContent = {
+            DropdownMenuItem(
+                onClick = {
+                    onTogglePinned()
+                    menuState.expanded = false
+                }
+            ) {
+                Text(
+                    text = stringResource(
+                        if (history.isPinned) R.string.menu_top_del else R.string.menu_top
+                    )
+                )
+            }
+            DropdownMenuItem(
+                onClick = {
+                    onRemove()
+                    menuState.expanded = false
+                }
+            ) {
+                Text(text = stringResource(id = R.string.menu_remove))
+            }
+        },
+        modifier = modifier,
+        menuState = menuState,
+        shape = RoundedCornerShape(6.dp),
+        onClick = onClick,
+    ) {
+        ForumLabel(title = history.title.removeSuffix("吧"))
     }
 }
 
@@ -507,7 +562,7 @@ private fun ForumItem(
 fun HomePage(
     viewModel: HomeViewModel = pageViewModel(),
     canOpenExplore: Boolean = false,
-    isSelected: Boolean = true,
+    forumGridState: LazyGridState,
     onOpenExplore: () -> Unit = {},
 ) {
     val account = LocalAccount.current
@@ -554,7 +609,8 @@ fun HomePage(
                 .asSequence()
                 .filterNot { it.data in followedForumNames }
                 .sortedWith(
-                    compareByDescending<History> { it.timestamp }
+                    compareByDescending<History> { it.isPinned }
+                        .thenByDescending { it.timestamp }
                         .thenByDescending { it.count }
                 )
                 .toList()
@@ -565,11 +621,17 @@ fun HomePage(
             context.appPreferences.homePageShowHistoryForum && recentHistoryForums.isNotEmpty()
         }
     }
-    var listSingle by remember { mutableStateOf(context.appPreferences.listSingle) }
+    var forumListLayout by remember {
+        mutableStateOf(
+            ForumListLayout.fromPreference(
+                context.appPreferences.homeForumListLayout,
+                context.appPreferences.listSingle,
+            )
+        )
+    }
     var expandFollowedForums by rememberSaveable { mutableStateOf(true) }
     val isError by remember { derivedStateOf { error != null } }
-    val gridCells by remember { derivedStateOf { getGridCells(context, listSingle) } }
-    val forumGridState = rememberLazyGridState()
+    val gridCells by remember { derivedStateOf { getGridCells(forumListLayout) } }
 
     onGlobalEvent<GlobalEvent.Refresh>(
         filter = { it.key == "home" }
@@ -601,12 +663,6 @@ fun HomePage(
             viewModel.send(HomeUiIntent.Refresh)
         }
     }
-    LaunchedEffect(isSelected) {
-        if (isSelected) {
-            forumGridState.scrollToItem(0)
-        }
-    }
-
     MyScaffold(
         backgroundColor = Color.Transparent,
         topBar = {
@@ -622,10 +678,18 @@ fun HomePage(
                     }
                     ActionItem(
                         icon = Icons.Outlined.ViewAgenda,
-                        contentDescription = stringResource(id = R.string.title_switch_list_single)
+                        contentDescription = stringResource(
+                            id = when (forumListLayout.next()) {
+                                ForumListLayout.Single -> R.string.title_switch_list_single
+                                ForumListLayout.Double -> R.string.title_switch_list_double
+                                ForumListLayout.Quad -> R.string.title_switch_list_quad
+                            }
+                        )
                     ) {
-                        context.appPreferences.listSingle = !listSingle
-                        listSingle = !listSingle
+                        val nextLayout = forumListLayout.next()
+                        context.appPreferences.homeForumListLayout = nextLayout.ordinal
+                        context.appPreferences.listSingle = nextLayout == ForumListLayout.Single
+                        forumListLayout = nextLayout
                     }
                 }
             )
@@ -663,7 +727,10 @@ fun HomePage(
                         )
                     },
                     loadingScreen = {
-                        HomePageSkeletonScreen(listSingle = listSingle, gridCells = gridCells)
+                        HomePageSkeletonScreen(
+                            forumListLayout = forumListLayout,
+                            gridCells = gridCells,
+                        )
                     },
                     errorScreen = {
                         error?.let { ErrorScreen(error = it) }
@@ -703,11 +770,24 @@ fun HomePage(
                                                 ) {
                                                     forumRow.forEach { forum ->
                                                         HistoryForumItem(
-                                                            title = forum.title,
+                                                            history = forum,
                                                             modifier = Modifier.weight(1f),
                                                             onClick = {
                                                                 navigator.navigate(
                                                                     ForumPageDestination(forum.data)
+                                                                )
+                                                            },
+                                                            onTogglePinned = {
+                                                                viewModel.send(
+                                                                    HomeUiIntent.SetHistoryPinned(
+                                                                        historyId = forum.id,
+                                                                        isPinned = !forum.isPinned,
+                                                                    )
+                                                                )
+                                                            },
+                                                            onRemove = {
+                                                                viewModel.send(
+                                                                    HomeUiIntent.DeleteHistory(forum.id)
                                                                 )
                                                             },
                                                         )
@@ -737,24 +817,34 @@ fun HomePage(
                                 items = topForums,
                                 key = { "Top${it.forumId}" }
                             ) { item ->
-                                ForumItem(
-                                    item,
-                                    true,
-                                    onClick = {
-                                        navigator.navigate(ForumPageDestination(it.forumName))
-                                    },
-                                    onUnfollow = {
-                                        unfollowForum = it
-                                        confirmUnfollowDialog.show()
-                                    },
-                                    onAddTopForum = {
-                                        viewModel.send(HomeUiIntent.TopForums.Add(it))
-                                    },
-                                    onDeleteTopForum = {
-                                        viewModel.send(HomeUiIntent.TopForums.Delete(it.forumId))
-                                    },
-                                    isTopForum = true
-                                )
+                                if (forumListLayout == ForumListLayout.Quad) {
+                                    CompactForumItem(
+                                        title = item.forumName.removeSuffix("吧"),
+                                        modifier = Modifier.padding(4.dp),
+                                        onClick = {
+                                            navigator.navigate(ForumPageDestination(item.forumName))
+                                        },
+                                    )
+                                } else {
+                                    ForumItem(
+                                        item,
+                                        true,
+                                        onClick = {
+                                            navigator.navigate(ForumPageDestination(it.forumName))
+                                        },
+                                        onUnfollow = {
+                                            unfollowForum = it
+                                            confirmUnfollowDialog.show()
+                                        },
+                                        onAddTopForum = {
+                                            viewModel.send(HomeUiIntent.TopForums.Add(it))
+                                        },
+                                        onDeleteTopForum = {
+                                            viewModel.send(HomeUiIntent.TopForums.Delete(it.forumId))
+                                        },
+                                        isTopForum = true
+                                    )
+                                }
                             }
                         }
                         item(key = "ForumHeader", span = { GridItemSpan(maxLineSpan) }) {
@@ -772,23 +862,33 @@ fun HomePage(
                                 items = forums,
                                 key = { it.forumId }
                             ) { item ->
-                                ForumItem(
-                                    item,
-                                    true,
-                                    onClick = {
-                                        navigator.navigate(ForumPageDestination(it.forumName))
-                                    },
-                                    onUnfollow = {
-                                        unfollowForum = it
-                                        confirmUnfollowDialog.show()
-                                    },
-                                    onAddTopForum = {
-                                        viewModel.send(HomeUiIntent.TopForums.Add(it))
-                                    },
-                                    onDeleteTopForum = {
-                                        viewModel.send(HomeUiIntent.TopForums.Delete(it.forumId))
-                                    }
-                                )
+                                if (forumListLayout == ForumListLayout.Quad) {
+                                    CompactForumItem(
+                                        title = item.forumName.removeSuffix("吧"),
+                                        modifier = Modifier.padding(4.dp),
+                                        onClick = {
+                                            navigator.navigate(ForumPageDestination(item.forumName))
+                                        },
+                                    )
+                                } else {
+                                    ForumItem(
+                                        item,
+                                        true,
+                                        onClick = {
+                                            navigator.navigate(ForumPageDestination(it.forumName))
+                                        },
+                                        onUnfollow = {
+                                            unfollowForum = it
+                                            confirmUnfollowDialog.show()
+                                        },
+                                        onAddTopForum = {
+                                            viewModel.send(HomeUiIntent.TopForums.Add(it))
+                                        },
+                                        onDeleteTopForum = {
+                                            viewModel.send(HomeUiIntent.TopForums.Delete(it.forumId))
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
@@ -808,7 +908,7 @@ fun HomePage(
 
 @Composable
 private fun HomePageSkeletonScreen(
-    listSingle: Boolean,
+    forumListLayout: ForumListLayout,
     gridCells: GridCells
 ) {
     MyLazyVerticalGrid(
@@ -832,7 +932,11 @@ private fun HomePageSkeletonScreen(
             }
         }
         items(6, key = { "TopPlaceholder$it" }) {
-            ForumItemPlaceholder(listSingle)
+            if (forumListLayout == ForumListLayout.Quad) {
+                ForumLabel(title = "", modifier = Modifier.padding(4.dp))
+            } else {
+                ForumItemPlaceholder(showAvatar = true)
+            }
         }
         item(
             key = "Spacer",
@@ -857,7 +961,11 @@ private fun HomePageSkeletonScreen(
             }
         }
         items(12, key = { "Placeholder$it" }) {
-            ForumItemPlaceholder(listSingle)
+            if (forumListLayout == ForumListLayout.Quad) {
+                ForumLabel(title = "", modifier = Modifier.padding(4.dp))
+            } else {
+                ForumItemPlaceholder(showAvatar = true)
+            }
         }
     }
 }
