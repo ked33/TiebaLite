@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -33,7 +34,6 @@ import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Tab
 import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Refresh
@@ -54,7 +54,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -175,154 +174,103 @@ private fun setHideSpecialThreads(
 }
 
 @Composable
-private fun ForumToolbarInfoPlaceholder(
+private fun ForumToolbarTitle(
+    forumName: String,
+    forumInfoImmutableHolder: ImmutableHolder<ForumInfo>?,
+    onOpenForumInfo: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    if (LocalAccount.current == null) return
-
-    Row(
-        modifier = modifier
+    val forum = forumInfoImmutableHolder?.get()
+    val titleModifier = if (forum != null) {
+        modifier
             .fillMaxWidth()
-            .height(44.dp)
-            .padding(start = 16.dp, end = 8.dp, bottom = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(0.35f)
-                    .height(11.dp)
-                    .clip(RoundedCornerShape(100))
-                    .placeholder(
-                        visible = true,
-                        color = ExtendedTheme.colors.onTopBar.copy(alpha = 0.16f),
-                        highlight = PlaceholderHighlight.fade(),
-                    )
+            .debounceClickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onOpenForumInfo,
             )
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(5.dp)
-                    .clip(RoundedCornerShape(100))
-                    .placeholder(
-                        visible = true,
-                        color = ExtendedTheme.colors.onTopBar.copy(alpha = 0.16f),
-                        highlight = PlaceholderHighlight.fade(),
-                    )
-            )
-        }
-        Spacer(modifier = Modifier.size(12.dp))
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(100))
-                .placeholder(
-                    visible = true,
-                    color = ExtendedTheme.colors.onTopBar.copy(alpha = 0.16f),
-                    highlight = PlaceholderHighlight.fade(),
-                )
-                .padding(horizontal = 16.dp, vertical = 6.dp)
-        ) {
-            Text(text = stringResource(id = R.string.button_sign_in), fontSize = 12.sp)
-        }
+    } else {
+        modifier.fillMaxWidth()
     }
-}
 
-@Composable
-private fun ForumToolbarInfo(
-    forumInfoImmutableHolder: ImmutableHolder<ForumInfo>,
-    onBtnClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val (forum) = forumInfoImmutableHolder
-    val account = LocalAccount.current
-    if (forum.is_like != 1 && account == null) return
-
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(44.dp)
-            .padding(start = 16.dp, end = 8.dp, bottom = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        if (forum.is_like == 1) {
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Text(
-                        text = stringResource(
-                            id = R.string.tip_forum_header_liked,
-                            forum.user_level.toString(),
-                            forum.level_name
-                        ),
-                        style = MaterialTheme.typography.caption,
-                        color = ExtendedTheme.colors.onTopBarSecondary,
-                        fontSize = 11.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Text(
-                        text = "${max(0, forum.cur_score)}/${max(1, forum.levelup_score)}",
-                        style = MaterialTheme.typography.caption,
-                        color = ExtendedTheme.colors.onTopBarSecondary,
-                        fontSize = 10.sp,
-                        maxLines = 1,
-                    )
-                }
+    Column(modifier = titleModifier) {
+        Text(
+            text = stringResource(id = R.string.title_forum, forumName),
+            fontSize = 17.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        if (forum?.is_like == 1) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = stringResource(
+                        id = R.string.tip_forum_header_liked,
+                        forum.user_level.toString(),
+                        forum.level_name,
+                    ),
+                    style = MaterialTheme.typography.caption,
+                    color = ExtendedTheme.colors.onTopBarSecondary,
+                    fontSize = 9.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                Spacer(modifier = Modifier.width(6.dp))
                 LinearProgressIndicator(
                     progress = max(
                         0F,
                         min(
                             1F,
-                            forum.cur_score * 1.0F / max(1.0F, forum.levelup_score * 1.0F)
-                        )
+                            forum.cur_score * 1.0F / max(1.0F, forum.levelup_score * 1.0F),
+                        ),
                     ),
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(100))
-                        .height(5.dp),
+                        .width(44.dp)
+                        .height(4.dp)
+                        .clip(RoundedCornerShape(100)),
                     color = ExtendedTheme.colors.primary,
-                    backgroundColor = ExtendedTheme.colors.onTopBar.copy(alpha = 0.16f)
+                    backgroundColor = ExtendedTheme.colors.onTopBar.copy(alpha = 0.16f),
                 )
             }
-        } else {
-            Spacer(modifier = Modifier.weight(1f))
         }
-        if (account != null) {
-            Spacer(modifier = Modifier.size(12.dp))
-            val btnEnabled =
-                (forum.is_like != 1) || (forum.sign_in_info?.user_info?.is_sign_in != 1)
-            Button(
-                onClick = onBtnClick,
-                elevation = null,
-                shape = RoundedCornerShape(100),
-                colors = ButtonDefaults.buttonColors(
-                    backgroundColor = ExtendedTheme.colors.primary,
-                    contentColor = ExtendedTheme.colors.onAccent
-                ),
-                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
-                enabled = btnEnabled
-            ) {
-                val text = when {
-                    forum.is_like != 1 -> stringResource(id = R.string.button_follow)
-                    forum.sign_in_info?.user_info?.is_sign_in == 1 -> stringResource(
-                        id = R.string.button_signed_in,
-                        forum.sign_in_info.user_info.cont_sign_num
-                    )
+    }
+}
 
-                    else -> stringResource(id = R.string.button_sign_in)
-                }
-                Text(text = text, fontSize = 12.sp)
-            }
+@Composable
+private fun ForumToolbarAccountAction(
+    forumInfoImmutableHolder: ImmutableHolder<ForumInfo>?,
+    onBtnClick: () -> Unit,
+) {
+    val forum = forumInfoImmutableHolder?.get() ?: return
+    if (LocalAccount.current == null) return
+
+    val btnEnabled =
+        (forum.is_like != 1) || (forum.sign_in_info?.user_info?.is_sign_in != 1)
+    Button(
+        onClick = onBtnClick,
+        modifier = Modifier
+            .padding(end = 4.dp)
+            .height(36.dp),
+        elevation = null,
+        shape = RoundedCornerShape(100),
+        colors = ButtonDefaults.buttonColors(
+            backgroundColor = ExtendedTheme.colors.primary,
+            contentColor = ExtendedTheme.colors.onAccent,
+        ),
+        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 5.dp),
+        enabled = btnEnabled,
+    ) {
+        val text = when {
+            forum.is_like != 1 -> stringResource(id = R.string.button_follow)
+            forum.sign_in_info?.user_info?.is_sign_in == 1 -> stringResource(
+                id = R.string.button_signed_in,
+                forum.sign_in_info.user_info.cont_sign_num,
+            )
+
+            else -> stringResource(id = R.string.button_sign_in)
         }
+        Text(text = text, fontSize = 11.sp, maxLines = 1)
     }
 }
 
@@ -605,15 +553,16 @@ fun ForumPage(
                                 )
                             }
                         },
-                        onBtnClick = {
+                        onBtnClick = onBtnClick@{
                             forumInfo?.let { holder ->
                                 val (forum) = holder
+                                val accountTbs = tbs ?: account?.tbs ?: return@onBtnClick
                                 when {
                                     forum.is_like != 1 -> viewModel.send(
                                         ForumUiIntent.Like(
                                             forum.id,
                                             forum.name,
-                                            tbs ?: account!!.tbs
+                                            accountTbs
                                         )
                                     )
 
@@ -622,7 +571,7 @@ fun ForumPage(
                                             ForumUiIntent.SignIn(
                                                 forum.id,
                                                 forum.name,
-                                                tbs ?: account!!.tbs
+                                                accountTbs
                                             )
                                         )
                                     }
@@ -1050,7 +999,6 @@ fun LoadingPlaceholder(
         topBar = {
             ForumToolbar(
                 forumName = forumName,
-                showInfoPlaceholder = true,
                 menuContent = {
                     DropdownMenuItem(
                         onClick = {
@@ -1100,24 +1048,9 @@ fun LoadingPlaceholder(
 }
 
 @Composable
-private fun BackNavigationIconPlaceholder() {
-    IconButton(
-        onClick = {},
-        enabled = false,
-        modifier = Modifier.alpha(0f)
-    ) {
-        Icon(
-            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-            contentDescription = null
-        )
-    }
-}
-
-@Composable
 private fun ForumToolbar(
     forumName: String,
     forumInfoImmutableHolder: ImmutableHolder<ForumInfo>? = null,
-    showInfoPlaceholder: Boolean = false,
     onOpenForumInfo: () -> Unit = {},
     onBtnClick: () -> Unit = {},
     menuContent: @Composable (MenuScope.() -> Unit)? = null,
@@ -1126,22 +1059,10 @@ private fun ForumToolbar(
     val navigator = LocalNavigator.current
     Toolbar(
         title = {
-            Text(
-                text = stringResource(
-                    id = R.string.title_forum,
-                    forumName
-                ),
-                modifier = if (forumInfoImmutableHolder != null) {
-                    Modifier.debounceClickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        onClick = onOpenForumInfo,
-                    )
-                } else {
-                    Modifier
-                },
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+            ForumToolbarTitle(
+                forumName = forumName,
+                forumInfoImmutableHolder = forumInfoImmutableHolder,
+                onOpenForumInfo = onOpenForumInfo,
             )
         },
         navigationIcon = {
@@ -1151,6 +1072,10 @@ private fun ForumToolbar(
             })
         },
         actions = {
+            ForumToolbarAccountAction(
+                forumInfoImmutableHolder = forumInfoImmutableHolder,
+                onBtnClick = onBtnClick,
+            )
             if (forumId != null) {
                 var lastClickTime by remember { mutableLongStateOf(0L) }
                 IconButton(
@@ -1190,14 +1115,5 @@ private fun ForumToolbar(
                 }
             }
         },
-        content = {
-            when {
-                showInfoPlaceholder -> ForumToolbarInfoPlaceholder()
-                forumInfoImmutableHolder != null -> ForumToolbarInfo(
-                    forumInfoImmutableHolder = forumInfoImmutableHolder!!,
-                    onBtnClick = onBtnClick,
-                )
-            }
-        }
     )
 }
