@@ -291,20 +291,24 @@ fun UserPage(
                     .verticalScroll(state = rememberScrollState())
                     .fillMaxSize()
             ) {
-                if (account != null) {
+                val currentAccount = account
+                if (currentAccount != null) {
+                    val uid = currentAccount.uid.toLongOrNull()
                     InfoCard(
                         modifier = Modifier
                             .padding(top = 8.dp)
-                            .clickable {
-                                navigator.navigate(UserProfilePageDestination(account!!.uid.toLong()))
+                            .clickable(enabled = uid != null) {
+                                uid?.let {
+                                    navigator.navigate(UserProfilePageDestination(it))
+                                }
                             }
                             .padding(horizontal = 16.dp, vertical = 16.dp),
-                        userName = account!!.nameShow ?: account!!.name,
-                        userIntro = account!!.intro ?: stringResource(id = R.string.tip_no_intro),
-                        avatar = StringUtil.getAvatarUrl(account!!.portrait),
+                        userName = currentAccount.nameShow ?: currentAccount.name,
+                        userIntro = currentAccount.intro ?: stringResource(id = R.string.tip_no_intro),
+                        avatar = StringUtil.getAvatarUrl(currentAccount.portrait),
                     )
                     StatCard(
-                        account = account!!,
+                        account = currentAccount,
                         modifier = Modifier
                             .padding(16.dp)
                             .clip(RoundedCornerShape(8.dp))

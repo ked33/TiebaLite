@@ -63,15 +63,16 @@ object AccountUtil {
         get() = mutableAllAccountsState.value
 
     fun init(context: Context) {
-        val account = runCatching {
-            val loginUser =
-                context.getSharedPreferences("accountData", Context.MODE_PRIVATE).getInt("now", -1)
-            if (loginUser == -1) {
-                null
-            } else getAccountInfo(loginUser)
-        }.getOrNull()
+        val accountPreferences =
+            context.getSharedPreferences("accountData", Context.MODE_PRIVATE)
+        val loginUser = accountPreferences.getInt("now", -1)
+        val accounts = runBlocking(Dispatchers.IO) { DatabaseUtil.getAllAccounts() }
+        val account = accounts.firstOrNull { it.id == loginUser && it.hasValidUid() }
+        if (loginUser != -1 && account == null) {
+            accountPreferences.edit().remove("now").apply()
+        }
         mutableCurrentAccountState.value = account
-        mutableAllAccountsState.value = runBlocking(Dispatchers.IO) { DatabaseUtil.getAllAccounts() }
+        mutableAllAccountsState.value = accounts
     }
 
     @JvmStatic
@@ -92,8 +93,12 @@ object AccountUtil {
         }
     }
 
-    private fun getAccountInfo(accountId: Int): Account {
-        return runBlocking(Dispatchers.IO) { DatabaseUtil.getAccountById(accountId) } ?: Account()
+    private fun Account.hasValidUid(): Boolean {
+        return uid.toLongOrNull() != null
+    }
+
+    private fun getAccountInfo(accountId: Int): Account? {
+        return runBlocking(Dispatchers.IO) { DatabaseUtil.getAccountById(accountId) }
     }
 
     @JvmStatic
@@ -102,8 +107,8 @@ object AccountUtil {
     }
 
     @JvmStatic
-    fun getAccountInfoByBduss(bduss: String): Account {
-        return runBlocking(Dispatchers.IO) { DatabaseUtil.getAccountByBduss(bduss) } ?: Account()
+    fun getAccountInfoByBduss(bduss: String): Account? {
+        return runBlocking(Dispatchers.IO) { DatabaseUtil.getAccountByBduss(bduss) }
     }
 
     @JvmStatic
@@ -113,14 +118,19 @@ object AccountUtil {
 
     @JvmStatic
     fun switchAccount(context: Context, id: Int): Boolean {
-        context.sendBroadcast(Intent().setAction(ACTION_SWITCH_ACCOUNT))
-        val account = runCatching { getAccountInfo(id) }.getOrNull() ?: return false
+        val account = runCatching { getAccountInfo(id) }.getOrNull()
+            ?.takeIf { it.hasValidUid() }
+            ?: return false
+        val persisted = context.getSharedPreferences("accountData", Context.MODE_PRIVATE).edit()
+            .putInt("now", id)
+            .commit()
+        if (!persisted) return false
         mutableCurrentAccountState.value = account
+        context.sendBroadcast(Intent().setAction(ACTION_SWITCH_ACCOUNT))
         GlobalScope.launch {
             emitGlobalEvent(GlobalEvent.AccountSwitched)
         }
-        return context.getSharedPreferences("accountData", Context.MODE_PRIVATE).edit()
-            .putInt("now", id).commit()
+        return true
     }
 
     private fun updateAccount(
@@ -202,7 +212,7 @@ object AccountUtil {
         val bduss = cookies["BDUSS"]
         val sToken = cookies["STOKEN"]
         if (bduss != null && sToken != null) {
-            val account = getAccountInfoByBduss(bduss)
+            val account = getAccountInfoByBduss(bduss) ?: return false
             runBlocking(Dispatchers.IO) {
                 DatabaseUtil.updateAccount(
                     account.apply {

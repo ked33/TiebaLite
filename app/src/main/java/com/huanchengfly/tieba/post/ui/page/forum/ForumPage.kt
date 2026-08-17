@@ -898,6 +898,69 @@ fun ForumPage(
                                             )
                                         }
                                     }
+                                    generalTabs.forEachIndexed { index, tab ->
+                                        val tabIndex = 3 + index
+                                        var currentSortIndex by remember(tab.tabId) {
+                                            mutableIntStateOf(0)
+                                        }
+                                        if (tab.sort_menu.isNotEmpty()) {
+                                            TabClickMenu(
+                                                selected = currentPage == tabIndex,
+                                                onClick = {
+                                                    coroutineScope.launch {
+                                                        pagerState.animateScrollToPage(tabIndex)
+                                                    }
+                                                },
+                                                text = {
+                                                    Text(
+                                                        text = tab.tabName,
+                                                        style = tabTextStyle
+                                                    )
+                                                },
+                                                menuContent = {
+                                                    ListSinglePicker(
+                                                        itemTitles = tab.sort_menu.map { it.text }.toImmutableList(),
+                                                        itemValues = tab.sort_menu.map { it.source_id }.toImmutableList(),
+                                                        selectedPosition = currentSortIndex,
+                                                        onItemSelected = { position, _, value, changed ->
+                                                            if (changed) {
+                                                                currentSortIndex = position
+                                                                coroutineScope.launch {
+                                                                    emitGlobalEvent(GeneralTabListUiEvent.Refresh(sortType = value))
+                                                                }
+                                                            }
+                                                            dismiss()
+                                                        }
+                                                    )
+                                                },
+                                                selectedContentColor = ExtendedTheme.colors.primary,
+                                                unselectedContentColor = ExtendedTheme.colors.textSecondary
+                                            )
+                                        } else {
+                                            Tab(
+                                                selected = currentPage == tabIndex,
+                                                onClick = {
+                                                    coroutineScope.launch {
+                                                        pagerState.animateScrollToPage(tabIndex)
+                                                    }
+                                                },
+                                                selectedContentColor = ExtendedTheme.colors.primary,
+                                                unselectedContentColor = ExtendedTheme.colors.textSecondary
+                                            ) {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    modifier = Modifier
+                                                        .height(48.dp)
+                                                        .padding(horizontal = 16.dp)
+                                                ) {
+                                                    Text(
+                                                        text = tab.tabName,
+                                                        style = tabTextStyle
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                                 if (currentPage < 3) {
                                     IconButton(
@@ -922,69 +985,6 @@ fun ForumPage(
                                             ),
                                             tint = ExtendedTheme.colors.textSecondary
                                         )
-                                    }
-                                }
-                                generalTabs.forEach { tab ->
-                                    val tabIndex = 3 + generalTabs.indexOf(tab)
-                                    var currentSortIndex by remember(tab.tabId) {
-                                        mutableIntStateOf(0)
-                                    }
-                                    if (tab.sort_menu.isNotEmpty()) {
-                                        TabClickMenu(
-                                            selected = currentPage == tabIndex,
-                                            onClick = {
-                                                coroutineScope.launch {
-                                                    pagerState.animateScrollToPage(tabIndex)
-                                                }
-                                            },
-                                            text = {
-                                                Text(
-                                                    text = tab.tabName,
-                                                    style = tabTextStyle
-                                                )
-                                            },
-                                            menuContent = {
-                                                ListSinglePicker(
-                                                    itemTitles = tab.sort_menu.map { it.text }.toImmutableList(),
-                                                    itemValues = tab.sort_menu.map { it.source_id }.toImmutableList(),
-                                                    selectedPosition = currentSortIndex,
-                                                    onItemSelected = { position, _, value, changed ->
-                                                        if (changed) {
-                                                            currentSortIndex = position
-                                                            coroutineScope.launch {
-                                                                emitGlobalEvent(GeneralTabListUiEvent.Refresh(sortType = value))
-                                                            }
-                                                        }
-                                                        dismiss()
-                                                    }
-                                                )
-                                            },
-                                            selectedContentColor = ExtendedTheme.colors.primary,
-                                            unselectedContentColor = ExtendedTheme.colors.textSecondary
-                                        )
-                                    } else {
-                                        Tab(
-                                            selected = currentPage == tabIndex,
-                                            onClick = {
-                                                coroutineScope.launch {
-                                                    pagerState.animateScrollToPage(tabIndex)
-                                                }
-                                            },
-                                            selectedContentColor = ExtendedTheme.colors.primary,
-                                            unselectedContentColor = ExtendedTheme.colors.textSecondary
-                                        ) {
-                                            Row(
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                modifier = Modifier
-                                                    .height(48.dp)
-                                                    .padding(horizontal = 16.dp)
-                                            ) {
-                                                Text(
-                                                    text = tab.tabName,
-                                                    style = tabTextStyle
-                                                )
-                                            }
-                                        }
                                     }
                                 }
                             }
