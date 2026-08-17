@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -193,7 +192,10 @@ private fun ForumToolbarTitle(
         modifier.fillMaxWidth()
     }
 
-    Column(modifier = titleModifier) {
+    Column(
+        modifier = titleModifier,
+        verticalArrangement = Arrangement.spacedBy(1.dp),
+    ) {
         Text(
             text = stringResource(id = R.string.title_forum, forumName),
             fontSize = 17.sp,
@@ -202,37 +204,33 @@ private fun ForumToolbarTitle(
             overflow = TextOverflow.Ellipsis,
         )
         if (forum?.is_like == 1) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = stringResource(
-                        id = R.string.tip_forum_header_liked,
-                        forum.user_level.toString(),
-                        forum.level_name,
+            Text(
+                text = stringResource(
+                    id = R.string.tip_forum_header_liked,
+                    forum.user_level.toString(),
+                    forum.level_name,
+                ),
+                style = MaterialTheme.typography.caption,
+                color = ExtendedTheme.colors.onTopBarSecondary,
+                fontSize = 9.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            LinearProgressIndicator(
+                progress = max(
+                    0F,
+                    min(
+                        1F,
+                        forum.cur_score * 1.0F / max(1.0F, forum.levelup_score * 1.0F),
                     ),
-                    style = MaterialTheme.typography.caption,
-                    color = ExtendedTheme.colors.onTopBarSecondary,
-                    fontSize = 9.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                LinearProgressIndicator(
-                    progress = max(
-                        0F,
-                        min(
-                            1F,
-                            forum.cur_score * 1.0F / max(1.0F, forum.levelup_score * 1.0F),
-                        ),
-                    ),
-                    modifier = Modifier
-                        .width(44.dp)
-                        .height(4.dp)
-                        .clip(RoundedCornerShape(100)),
-                    color = ExtendedTheme.colors.primary,
-                    backgroundColor = ExtendedTheme.colors.onTopBar.copy(alpha = 0.16f),
-                )
-            }
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(4.dp)
+                    .clip(RoundedCornerShape(100)),
+                color = ExtendedTheme.colors.primary,
+                backgroundColor = ExtendedTheme.colors.onTopBar.copy(alpha = 0.16f),
+            )
         }
     }
 }
@@ -255,8 +253,10 @@ private fun ForumToolbarAccountAction(
         elevation = null,
         shape = RoundedCornerShape(100),
         colors = ButtonDefaults.buttonColors(
-            backgroundColor = ExtendedTheme.colors.primary,
-            contentColor = ExtendedTheme.colors.onAccent,
+            backgroundColor = Color.Transparent,
+            contentColor = ExtendedTheme.colors.primary,
+            disabledBackgroundColor = Color.Transparent,
+            disabledContentColor = ExtendedTheme.colors.onTopBarSecondary,
         ),
         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 5.dp),
         enabled = btnEnabled,

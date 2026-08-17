@@ -164,7 +164,8 @@ fun MainPage(
                     content = {
                         HomePage(
                             viewModel = homeViewModel,
-                            canOpenExplore = !LocalContext.current.appPreferences.hideExplore
+                            canOpenExplore = !LocalContext.current.appPreferences.hideExplore,
+                            isSelected = pagerState.currentPage == 0,
                         ) {
                             coroutineScope.launch {
                                 pagerState.scrollToPage(1)

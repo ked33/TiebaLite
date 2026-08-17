@@ -10,8 +10,6 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -23,10 +21,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -106,6 +104,7 @@ import com.huanchengfly.tieba.post.ui.widgets.compose.rememberMenuState
 import com.huanchengfly.tieba.post.ui.widgets.compose.states.StateScreen
 import com.huanchengfly.tieba.post.utils.AccountUtil.LocalAccount
 import com.huanchengfly.tieba.post.utils.ImageUtil
+import com.huanchengfly.tieba.post.models.database.History
 import com.huanchengfly.tieba.post.utils.StringUtil.getShortNumString
 import com.huanchengfly.tieba.post.utils.TiebaUtil
 import com.huanchengfly.tieba.post.utils.appPreferences
@@ -246,26 +245,19 @@ private fun CollapsibleSectionHeader(
 @Composable
 private fun HistoryForumItem(
     title: String,
-    avatar: String?,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    Row(
-        modifier = Modifier
-            .height(42.dp)
-            .widthIn(min = 112.dp, max = 200.dp)
+    Box(
+        modifier = modifier
+            .height(36.dp)
+            .fillMaxWidth()
             .clip(RoundedCornerShape(6.dp))
             .background(color = ExtendedTheme.colors.chip)
             .debounceClickable(onClick = onClick)
-            .padding(horizontal = 10.dp),
-        verticalAlignment = CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+            .padding(horizontal = 6.dp),
+        contentAlignment = Center,
     ) {
-        Avatar(
-            data = avatar,
-            contentDescription = null,
-            size = 28.dp,
-            shape = CircleShape,
-        )
         Text(
             text = title,
             style = MaterialTheme.typography.body2,
@@ -273,6 +265,7 @@ private fun HistoryForumItem(
             color = ExtendedTheme.colors.text,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
         )
     }
 }
@@ -509,11 +502,12 @@ private fun ForumItem(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterialApi::class)
+@OptIn(ExperimentalMaterialApi::class)
 @Composable
 fun HomePage(
     viewModel: HomeViewModel = pageViewModel(),
     canOpenExplore: Boolean = false,
+    isSelected: Boolean = true,
     onOpenExplore: () -> Unit = {},
 ) {
     val account = LocalAccount.current
@@ -553,11 +547,29 @@ fun HomePage(
         derivedStateOf { isEmpty && (!isLoggedIn || hasLoaded) }
     }
     val hasTopForum by remember { derivedStateOf { topForums.isNotEmpty() } }
-    val showHistoryForum by remember { derivedStateOf { context.appPreferences.homePageShowHistoryForum && historyForums.isNotEmpty() } }
+    val recentHistoryForums by remember {
+        derivedStateOf {
+            val followedForumNames = forums.mapTo(mutableSetOf()) { it.forumName }
+            historyForums
+                .asSequence()
+                .filterNot { it.data in followedForumNames }
+                .sortedWith(
+                    compareByDescending<History> { it.timestamp }
+                        .thenByDescending { it.count }
+                )
+                .toList()
+        }
+    }
+    val showHistoryForum by remember {
+        derivedStateOf {
+            context.appPreferences.homePageShowHistoryForum && recentHistoryForums.isNotEmpty()
+        }
+    }
     var listSingle by remember { mutableStateOf(context.appPreferences.listSingle) }
     var expandFollowedForums by rememberSaveable { mutableStateOf(true) }
     val isError by remember { derivedStateOf { error != null } }
     val gridCells by remember { derivedStateOf { getGridCells(context, listSingle) } }
+    val forumGridState = rememberLazyGridState()
 
     onGlobalEvent<GlobalEvent.Refresh>(
         filter = { it.key == "home" }
@@ -587,6 +599,11 @@ fun HomePage(
         if (isLoggedIn && !viewModel.initialized) {
             viewModel.send(HomeUiIntent.RefreshHistory)
             viewModel.send(HomeUiIntent.Refresh)
+        }
+    }
+    LaunchedEffect(isSelected) {
+        if (isSelected) {
+            forumGridState.scrollToItem(0)
         }
     }
 
@@ -654,6 +671,7 @@ fun HomePage(
                 ) {
                     MyLazyVerticalGrid(
                         columns = gridCells,
+                        state = forumGridState,
                         contentPadding = PaddingValues(bottom = 12.dp),
                         modifier = Modifier.fillMaxSize(),
                     ) {
@@ -662,7 +680,7 @@ fun HomePage(
                                 Column {
                                     CollapsibleSectionHeader(
                                         title = stringResource(id = R.string.title_history_forum),
-                                        itemCount = historyForums.size,
+                                        itemCount = recentHistoryForums.size,
                                         expanded = expandHistoryForum,
                                         onToggle = {
                                             viewModel.send(
@@ -671,24 +689,33 @@ fun HomePage(
                                         }
                                     )
                                     AnimatedVisibility(visible = expandHistoryForum) {
-                                        FlowRow(
+                                        Column(
                                             modifier = Modifier
                                                 .fillMaxWidth()
                                                 .padding(horizontal = 16.dp)
                                                 .padding(bottom = 12.dp),
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
                                             verticalArrangement = Arrangement.spacedBy(8.dp),
                                         ) {
-                                            historyForums.forEach { forum ->
-                                                HistoryForumItem(
-                                                    title = forum.title,
-                                                    avatar = forum.avatar,
-                                                    onClick = {
-                                                        navigator.navigate(
-                                                            ForumPageDestination(forum.data)
+                                            recentHistoryForums.chunked(4).forEach { forumRow ->
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                ) {
+                                                    forumRow.forEach { forum ->
+                                                        HistoryForumItem(
+                                                            title = forum.title,
+                                                            modifier = Modifier.weight(1f),
+                                                            onClick = {
+                                                                navigator.navigate(
+                                                                    ForumPageDestination(forum.data)
+                                                                )
+                                                            },
                                                         )
                                                     }
-                                                )
+                                                    repeat(4 - forumRow.size) {
+                                                        Spacer(modifier = Modifier.weight(1f))
+                                                    }
+                                                }
                                             }
                                         }
                                     }
@@ -712,7 +739,7 @@ fun HomePage(
                             ) { item ->
                                 ForumItem(
                                     item,
-                                    listSingle,
+                                    true,
                                     onClick = {
                                         navigator.navigate(ForumPageDestination(it.forumName))
                                     },
@@ -747,7 +774,7 @@ fun HomePage(
                             ) { item ->
                                 ForumItem(
                                     item,
-                                    listSingle,
+                                    true,
                                     onClick = {
                                         navigator.navigate(ForumPageDestination(it.forumName))
                                     },

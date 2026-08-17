@@ -565,7 +565,8 @@ private fun getDescText(
 ): String {
     val texts = listOfNotNull(
         time?.let { DateTimeUtils.getRelativeTimeString(App.INSTANCE, it) },
-        ipAddress?.let { App.INSTANCE.getString(R.string.text_ip_location, it) }
+        ipAddress?.takeIf { it.isNotBlank() }
+            ?.let { App.INSTANCE.getString(R.string.text_ip_location, it) }
     )
     if (texts.isEmpty()) return ""
     return texts.joinToString(" ")
@@ -588,6 +589,10 @@ private fun SubPostItem(
     val account = LocalAccount.current
     val coroutineScope = rememberCoroutineScope()
     val author = remember(subPost) { subPost.get { author }?.wrapImmutable() }
+    val authorIpLocation = remember(author) {
+        author?.get { ip_address }?.takeIf { it.isNotBlank() }
+            ?: author?.get { ip }?.takeIf { it.isNotBlank() }
+    }
     val hasAgreed = remember(subPost) {
         subPost.get { agree?.hasAgree == 1 }
     }
@@ -682,7 +687,8 @@ private fun SubPostItem(
                                 Text(
                                     text = getDescText(
                                         subPost.get { time }.toLong(),
-                                        author.get { ip_address })
+                                        authorIpLocation,
+                                    )
                                 )
                             },
                             onClick = {
