@@ -239,7 +239,7 @@ private fun ForumToolbarTitle(
                     color = ExtendedTheme.colors.primary,
                     backgroundColor = ExtendedTheme.colors.onTopBar.copy(alpha = 0.16f),
                 )
-            )
+            }
         }
         accountAction()
     }
