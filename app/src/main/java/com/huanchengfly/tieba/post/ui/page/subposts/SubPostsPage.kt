@@ -589,9 +589,10 @@ private fun SubPostItem(
     val account = LocalAccount.current
     val coroutineScope = rememberCoroutineScope()
     val author = remember(subPost) { subPost.get { author }?.wrapImmutable() }
-    val authorIpLocation = remember(author) {
+    val authorIpLocation = remember(subPost, author) {
         author?.get { ip_address }?.takeIf { it.isNotBlank() }
             ?: author?.get { ip }?.takeIf { it.isNotBlank() }
+            ?: subPost.get { location?.name }?.takeIf { it.isNotBlank() }
     }
     val hasAgreed = remember(subPost) {
         subPost.get { agree?.hasAgree == 1 }

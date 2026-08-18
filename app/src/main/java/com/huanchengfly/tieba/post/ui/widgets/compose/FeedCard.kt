@@ -483,7 +483,7 @@ private fun ThreadMedia(
                         text = {
                             Text(text = stringResource(id = R.string.desc_video))
                         },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(0.4f)
                     )
                 } else {
                     val aspectRatio = remember(videoInfo) {

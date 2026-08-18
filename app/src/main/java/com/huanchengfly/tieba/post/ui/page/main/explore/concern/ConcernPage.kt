@@ -127,6 +127,7 @@ fun ConcernPage(
                                     },
                                     onClickForum = { navigator.navigate(ForumPageDestination(it.name)) },
                                     onClickUser = { navigator.navigate(UserProfilePageDestination(it.id)) },
+                                    actionsOnTop = true,
                                 )
                                 if (index < data.size - 1) {
                                     VerticalDivider(

@@ -8,7 +8,6 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -21,8 +20,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.ButtonDefaults
 import androidx.compose.material.DropdownMenuItem
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.FloatingActionButton
@@ -97,7 +94,6 @@ import com.huanchengfly.tieba.post.ui.page.forum.threadlist.ForumThreadListPage
 import com.huanchengfly.tieba.post.ui.page.forum.threadlist.ForumThreadListType
 import com.huanchengfly.tieba.post.ui.page.forum.threadlist.ForumThreadListUiEvent
 import com.huanchengfly.tieba.post.ui.widgets.compose.BackNavigationIcon
-import com.huanchengfly.tieba.post.ui.widgets.compose.Button
 import com.huanchengfly.tieba.post.ui.widgets.compose.ClickMenu
 import com.huanchengfly.tieba.post.ui.widgets.compose.ConfirmDialog
 import com.huanchengfly.tieba.post.ui.widgets.compose.FeedCardPlaceholder
@@ -199,44 +195,24 @@ private fun ForumToolbarTitle(
 }
 
 @Composable
-private fun ForumToolbarFollowAction(
+private fun MenuScope.ForumToolbarFollowAndSignInMenuItem(
     forumInfoImmutableHolder: ImmutableHolder<ForumInfo>?,
     onBtnClick: () -> Unit,
 ) {
     val forum = forumInfoImmutableHolder?.get() ?: return
     if (LocalAccount.current == null) return
-    if (forum.is_like == 1) return
 
-    Button(
-        onClick = onBtnClick,
-        modifier = Modifier
-            .padding(end = 4.dp)
-            .height(36.dp),
-        elevation = null,
-        shape = RoundedCornerShape(100),
-        colors = ButtonDefaults.buttonColors(
-            backgroundColor = Color.Transparent,
-            contentColor = ExtendedTheme.colors.primary,
-            disabledBackgroundColor = Color.Transparent,
-            disabledContentColor = ExtendedTheme.colors.onTopBarSecondary,
-        ),
-        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 5.dp),
-    ) {
-        Text(
-            text = stringResource(id = R.string.button_follow),
-            fontSize = 11.sp,
-            maxLines = 1,
-        )
+    if (forum.is_like != 1) {
+        DropdownMenuItem(
+            onClick = {
+                onBtnClick()
+                dismiss()
+            }
+        ) {
+            Text(text = stringResource(id = R.string.button_follow))
+        }
+        return
     }
-}
-
-@Composable
-private fun MenuScope.ForumToolbarSignInMenuItem(
-    forumInfoImmutableHolder: ImmutableHolder<ForumInfo>?,
-    onBtnClick: () -> Unit,
-) {
-    val forum = forumInfoImmutableHolder?.get() ?: return
-    if (LocalAccount.current == null || forum.is_like != 1) return
 
     val isSignedIn = forum.sign_in_info?.user_info?.is_sign_in == 1
     DropdownMenuItem(
@@ -1062,10 +1038,6 @@ private fun ForumToolbar(
             })
         },
         actions = {
-            ForumToolbarFollowAction(
-                forumInfoImmutableHolder = forumInfoImmutableHolder,
-                onBtnClick = onBtnClick,
-            )
             if (forumId != null) {
                 var lastClickTime by remember { mutableLongStateOf(0L) }
                 IconButton(
@@ -1089,7 +1061,7 @@ private fun ForumToolbar(
                     val menuState = rememberMenuState()
                     ClickMenu(
                         menuContent = {
-                            ForumToolbarSignInMenuItem(
+                            ForumToolbarFollowAndSignInMenuItem(
                                 forumInfoImmutableHolder = forumInfoImmutableHolder,
                                 onBtnClick = onBtnClick,
                             )
