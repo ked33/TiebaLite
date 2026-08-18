@@ -324,6 +324,7 @@ fun HotPage(
                                 },
                                 onClickForum = { navigator.navigate(ForumPageDestination(it.name)) },
                                 onClickUser = { navigator.navigate(UserProfilePageDestination(it.id)) },
+                                actionsOnTop = true,
                             ) {
                                 Column(
                                     horizontalAlignment = Alignment.End,

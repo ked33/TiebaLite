@@ -2269,6 +2269,18 @@ private fun SubPostItem(
     val navigator = LocalNavigator.current
     val coroutineScope = rememberCoroutineScope()
     val menuState = rememberMenuState()
+    val subPostIpLocation = remember(subPostList) {
+        subPostList.get { author?.ip_address }?.takeIf { it.isNotBlank() }
+            ?: subPostList.get { author?.ip }?.takeIf { it.isNotBlank() }
+            ?: subPostList.get { location?.name }?.takeIf { it.isNotBlank() }
+    }
+    val subPostDesc = remember(subPostList, subPostIpLocation) {
+        getDescText(
+            time = subPostList.get { time }.toLong(),
+            floor = 0,
+            ipAddress = subPostIpLocation,
+        )
+    }
     LongClickMenu(
         menuState = menuState,
         menuContent = {
@@ -2315,22 +2327,35 @@ private fun SubPostItem(
         }
     ) {
         ProvideTextStyle(value = MaterialTheme.typography.body2.copy(color = ExtendedTheme.colors.text)) {
-            PbContentText(
-                text = subPostContent,
+            Column(
                 modifier = modifier,
-                fontSize = 13.sp,
-                emoticonSize = 0.9f,
-                overflow = TextOverflow.Ellipsis,
-                maxLines = 4,
-                lineSpacing = 0.4.sp,
-                inlineContent = mapOf(
-                    "Lz" to buildChipInlineContent(
-                        stringResource(id = R.string.tip_lz),
-                        backgroundColor = ExtendedTheme.colors.textSecondary.copy(alpha = 0.1f),
-                        color = ExtendedTheme.colors.textSecondary
-                    ),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                PbContentText(
+                    text = subPostContent,
+                    modifier = Modifier.fillMaxWidth(),
+                    fontSize = 13.sp,
+                    emoticonSize = 0.9f,
+                    overflow = TextOverflow.Ellipsis,
+                    maxLines = 4,
+                    lineSpacing = 0.4.sp,
+                    inlineContent = mapOf(
+                        "Lz" to buildChipInlineContent(
+                            stringResource(id = R.string.tip_lz),
+                            backgroundColor = ExtendedTheme.colors.textSecondary.copy(alpha = 0.1f),
+                            color = ExtendedTheme.colors.textSecondary
+                        ),
+                    )
                 )
-            )
+                if (subPostDesc.isNotBlank()) {
+                    Text(
+                        text = subPostDesc,
+                        color = ExtendedTheme.colors.textSecondary,
+                        style = MaterialTheme.typography.caption,
+                        fontSize = 11.sp,
+                    )
+                }
+            }
         }
     }
 }

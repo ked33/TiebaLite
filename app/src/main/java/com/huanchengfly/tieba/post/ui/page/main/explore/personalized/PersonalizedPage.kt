@@ -352,6 +352,7 @@ private fun FeedList(
                                         }
                                     },
                                     onClickUser = onClickUser,
+                                    actionsOnTop = true,
                                 ) {
                                     if (personalized != null) {
                                         Dislike(
