@@ -152,7 +152,6 @@ jobs:
           target_commitish: ${{ github.sha }}
           files: |
             ${{ steps.apk.outputs.apk_path }}
-            app/build/outputs/mapping/release/mapping.txt
 #
 #      - name: Post to channel
 #        if: contains(github.event.head_commit.message, '[skip post]') == false && github.event_name != 'pull_request'

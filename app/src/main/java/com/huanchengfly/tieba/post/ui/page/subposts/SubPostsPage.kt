@@ -566,7 +566,7 @@ private fun getDescText(
     val texts = listOfNotNull(
         time?.let { DateTimeUtils.getRelativeTimeString(App.INSTANCE, it) },
         ipAddress?.takeIf { it.isNotBlank() }
-            ?.let { App.INSTANCE.getString(R.string.text_ip_location, it) }
+            ?.let { App.INSTANCE.getString(R.string.text_profile_ip_location, it) }
     )
     if (texts.isEmpty()) return ""
     return texts.joinToString(" ")
