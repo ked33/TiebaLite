@@ -58,6 +58,7 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.font.FontWeight
@@ -250,19 +251,34 @@ private fun CollapsibleSectionHeader(
 private fun ForumLabel(
     title: String,
     modifier: Modifier = Modifier,
+    avatar: String? = null,
+    showAvatar: Boolean = false,
 ) {
-    Box(
+    val style = MaterialTheme.typography.body2
+    val avatarSize = with(LocalDensity.current) { style.fontSize.toDp() }
+    Row(
         modifier = modifier
             .height(36.dp)
             .fillMaxWidth()
             .clip(RoundedCornerShape(6.dp))
             .background(color = ExtendedTheme.colors.chip)
             .padding(horizontal = 6.dp),
-        contentAlignment = Center,
+        verticalAlignment = CenterVertically,
+        horizontalArrangement = Arrangement.Center,
     ) {
+        AnimatedVisibility(visible = showAvatar && avatar != null) {
+            Row(verticalAlignment = CenterVertically) {
+                Avatar(
+                    data = avatar,
+                    size = avatarSize,
+                    contentDescription = stringResource(R.string.forum_portrait),
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+            }
+        }
         Text(
             text = title,
-            style = MaterialTheme.typography.body2,
+            style = style,
             fontWeight = FontWeight.Medium,
             color = ExtendedTheme.colors.text,
             maxLines = 1,
@@ -277,9 +293,13 @@ private fun CompactForumItem(
     title: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    avatar: String? = null,
+    showAvatar: Boolean = false,
 ) {
     ForumLabel(
         title = title,
+        avatar = avatar,
+        showAvatar = showAvatar,
         modifier = modifier.debounceClickable(onClick = onClick),
     )
 }
@@ -291,6 +311,7 @@ private fun HistoryForumItem(
     onTogglePinned: () -> Unit,
     onRemove: () -> Unit,
     modifier: Modifier = Modifier,
+    showAvatar: Boolean = false,
 ) {
     val menuState = rememberMenuState()
     LongClickMenu(
@@ -321,7 +342,11 @@ private fun HistoryForumItem(
         shape = RoundedCornerShape(6.dp),
         onClick = onClick,
     ) {
-        ForumLabel(title = history.title.removeSuffix("吧"))
+        ForumLabel(
+            title = history.title.removeSuffix("吧"),
+            avatar = history.avatar,
+            showAvatar = showAvatar,
+        )
     }
 }
 
@@ -772,6 +797,7 @@ fun HomePage(
                                                         HistoryForumItem(
                                                             history = forum,
                                                             modifier = Modifier.weight(1f),
+                                                            showAvatar = forumListLayout == ForumListLayout.Quad,
                                                             onClick = {
                                                                 navigator.navigate(
                                                                     ForumPageDestination(forum.data)
@@ -865,6 +891,8 @@ fun HomePage(
                                 if (forumListLayout == ForumListLayout.Quad) {
                                     CompactForumItem(
                                         title = item.forumName.removeSuffix("吧"),
+                                        avatar = item.avatar,
+                                        showAvatar = true,
                                         modifier = Modifier.padding(4.dp),
                                         onClick = {
                                             navigator.navigate(ForumPageDestination(item.forumName))
