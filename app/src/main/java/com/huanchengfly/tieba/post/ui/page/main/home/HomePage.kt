@@ -24,6 +24,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -110,17 +111,26 @@ import com.huanchengfly.tieba.post.utils.TiebaUtil
 import com.huanchengfly.tieba.post.utils.appPreferences
 import kotlinx.collections.immutable.persistentListOf
 
-private enum class ForumListLayout(val columns: Int) {
-    Single(1),
-    Double(2),
-    Quad(4),
+private enum class ForumListLayout(
+    val columns: Int,
+    val preferenceValue: Int,
+) {
+    // Keep the existing persisted values stable; Triple was added after Quad.
+    Single(columns = 1, preferenceValue = 0),
+    Double(columns = 2, preferenceValue = 1),
+    Triple(columns = 3, preferenceValue = 3),
+    Quad(columns = 4, preferenceValue = 2),
     ;
+
+    val isCompact: Boolean
+        get() = columns >= Triple.columns
 
     fun next(): ForumListLayout = entries[(ordinal + 1) % entries.size]
 
     companion object {
         fun fromPreference(value: Int, legacyListSingle: Boolean): ForumListLayout =
-            entries.getOrNull(value) ?: if (legacyListSingle) Single else Double
+            entries.firstOrNull { it.preferenceValue == value }
+                ?: if (legacyListSingle) Single else Double
     }
 }
 
@@ -302,6 +312,26 @@ private fun CompactForumItem(
         showAvatar = showAvatar,
         modifier = modifier.debounceClickable(onClick = onClick),
     )
+}
+
+@Composable
+private fun <T> CompactForumRow(
+    items: List<T>,
+    columns: Int,
+    modifier: Modifier = Modifier,
+    itemContent: @Composable (item: T, modifier: Modifier) -> Unit,
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        items.forEach { item ->
+            itemContent(item, Modifier.weight(1f))
+        }
+        repeat(columns - items.size) {
+            Spacer(modifier = Modifier.weight(1f))
+        }
+    }
 }
 
 @Composable
@@ -707,12 +737,13 @@ fun HomePage(
                             id = when (forumListLayout.next()) {
                                 ForumListLayout.Single -> R.string.title_switch_list_single
                                 ForumListLayout.Double -> R.string.title_switch_list_double
+                                ForumListLayout.Triple -> R.string.title_switch_list_triple
                                 ForumListLayout.Quad -> R.string.title_switch_list_quad
                             }
                         )
                     ) {
                         val nextLayout = forumListLayout.next()
-                        context.appPreferences.homeForumListLayout = nextLayout.ordinal
+                        context.appPreferences.homeForumListLayout = nextLayout.preferenceValue
                         context.appPreferences.listSingle = nextLayout == ForumListLayout.Single
                         forumListLayout = nextLayout
                     }
@@ -788,39 +819,39 @@ fun HomePage(
                                                 .padding(bottom = 12.dp),
                                             verticalArrangement = Arrangement.spacedBy(8.dp),
                                         ) {
-                                            recentHistoryForums.chunked(4).forEach { forumRow ->
-                                                Row(
-                                                    modifier = Modifier.fillMaxWidth(),
-                                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                                ) {
-                                                    forumRow.forEach { forum ->
-                                                        HistoryForumItem(
-                                                            history = forum,
-                                                            modifier = Modifier.weight(1f),
-                                                            showAvatar = forumListLayout == ForumListLayout.Quad,
-                                                            onClick = {
-                                                                navigator.navigate(
-                                                                    ForumPageDestination(forum.data)
+                                            val historyColumns = if (forumListLayout.isCompact) {
+                                                forumListLayout.columns
+                                            } else {
+                                                ForumListLayout.Quad.columns
+                                            }
+                                            recentHistoryForums.chunked(historyColumns).forEach { forumRow ->
+                                                CompactForumRow(
+                                                    items = forumRow,
+                                                    columns = historyColumns,
+                                                ) { forum, itemModifier ->
+                                                    HistoryForumItem(
+                                                        history = forum,
+                                                        modifier = itemModifier,
+                                                        showAvatar = forumListLayout.isCompact,
+                                                        onClick = {
+                                                            navigator.navigate(
+                                                                ForumPageDestination(forum.data)
+                                                            )
+                                                        },
+                                                        onTogglePinned = {
+                                                            viewModel.send(
+                                                                HomeUiIntent.SetHistoryPinned(
+                                                                    historyId = forum.id,
+                                                                    isPinned = !forum.isPinned,
                                                                 )
-                                                            },
-                                                            onTogglePinned = {
-                                                                viewModel.send(
-                                                                    HomeUiIntent.SetHistoryPinned(
-                                                                        historyId = forum.id,
-                                                                        isPinned = !forum.isPinned,
-                                                                    )
-                                                                )
-                                                            },
-                                                            onRemove = {
-                                                                viewModel.send(
-                                                                    HomeUiIntent.DeleteHistory(forum.id)
-                                                                )
-                                                            },
-                                                        )
-                                                    }
-                                                    repeat(4 - forumRow.size) {
-                                                        Spacer(modifier = Modifier.weight(1f))
-                                                    }
+                                                            )
+                                                        },
+                                                        onRemove = {
+                                                            viewModel.send(
+                                                                HomeUiIntent.DeleteHistory(forum.id)
+                                                            )
+                                                        },
+                                                    )
                                                 }
                                             }
                                         }
@@ -843,7 +874,7 @@ fun HomePage(
                                 items = topForums,
                                 key = { "Top${it.forumId}" }
                             ) { item ->
-                                if (forumListLayout == ForumListLayout.Quad) {
+                                if (forumListLayout.isCompact) {
                                     CompactForumItem(
                                         title = item.forumName.removeSuffix("吧"),
                                         modifier = Modifier.padding(4.dp),
@@ -884,21 +915,45 @@ fun HomePage(
                             )
                         }
                         if (expandFollowedForums) {
-                            items(
-                                items = forums,
-                                key = { it.forumId }
-                            ) { item ->
-                                if (forumListLayout == ForumListLayout.Quad) {
-                                    CompactForumItem(
-                                        title = item.forumName.removeSuffix("吧"),
-                                        avatar = item.avatar,
-                                        showAvatar = true,
-                                        modifier = Modifier.padding(4.dp),
-                                        onClick = {
-                                            navigator.navigate(ForumPageDestination(item.forumName))
-                                        },
-                                    )
-                                } else {
+                            if (forumListLayout.isCompact) {
+                                val forumRows = forums.chunked(forumListLayout.columns)
+                                itemsIndexed(
+                                    items = forumRows,
+                                    key = { _, forumRow -> "ForumRow${forumRow.first().forumId}" },
+                                    span = { _, _ -> GridItemSpan(maxLineSpan) },
+                                ) { rowIndex, forumRow ->
+                                    CompactForumRow(
+                                        items = forumRow,
+                                        columns = forumListLayout.columns,
+                                        modifier = Modifier
+                                            .padding(horizontal = 16.dp)
+                                            .padding(
+                                                top = if (rowIndex == 0) 0.dp else 4.dp,
+                                                bottom = if (rowIndex == forumRows.lastIndex) {
+                                                    12.dp
+                                                } else {
+                                                    4.dp
+                                                },
+                                            ),
+                                    ) { item, itemModifier ->
+                                        CompactForumItem(
+                                            title = item.forumName.removeSuffix("吧"),
+                                            avatar = item.avatar,
+                                            showAvatar = true,
+                                            modifier = itemModifier,
+                                            onClick = {
+                                                navigator.navigate(
+                                                    ForumPageDestination(item.forumName)
+                                                )
+                                            },
+                                        )
+                                    }
+                                }
+                            } else {
+                                items(
+                                    items = forums,
+                                    key = { it.forumId }
+                                ) { item ->
                                     ForumItem(
                                         item,
                                         true,
@@ -960,7 +1015,7 @@ private fun HomePageSkeletonScreen(
             }
         }
         items(6, key = { "TopPlaceholder$it" }) {
-            if (forumListLayout == ForumListLayout.Quad) {
+            if (forumListLayout.isCompact) {
                 ForumLabel(title = "", modifier = Modifier.padding(4.dp))
             } else {
                 ForumItemPlaceholder(showAvatar = true)
@@ -988,10 +1043,28 @@ private fun HomePageSkeletonScreen(
                 Spacer(modifier = Modifier.height(8.dp))
             }
         }
-        items(12, key = { "Placeholder$it" }) {
-            if (forumListLayout == ForumListLayout.Quad) {
-                ForumLabel(title = "", modifier = Modifier.padding(4.dp))
-            } else {
+        if (forumListLayout.isCompact) {
+            val placeholderRows = List(12) { it }.chunked(forumListLayout.columns)
+            itemsIndexed(
+                items = placeholderRows,
+                key = { _, row -> "PlaceholderRow${row.first()}" },
+                span = { _, _ -> GridItemSpan(maxLineSpan) },
+            ) { rowIndex, row ->
+                CompactForumRow(
+                    items = row,
+                    columns = forumListLayout.columns,
+                    modifier = Modifier
+                        .padding(horizontal = 16.dp)
+                        .padding(
+                            top = if (rowIndex == 0) 0.dp else 4.dp,
+                            bottom = if (rowIndex == placeholderRows.lastIndex) 12.dp else 4.dp,
+                        ),
+                ) { _, itemModifier ->
+                    ForumLabel(title = "", modifier = itemModifier)
+                }
+            }
+        } else {
+            items(12, key = { "Placeholder$it" }) {
                 ForumItemPlaceholder(showAvatar = true)
             }
         }
