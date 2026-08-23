@@ -263,9 +263,18 @@ private fun ForumLabel(
     modifier: Modifier = Modifier,
     avatar: String? = null,
     showAvatar: Boolean = false,
+    largeCompact: Boolean = false,
 ) {
-    val style = MaterialTheme.typography.body2
-    val avatarSize = with(LocalDensity.current) { style.fontSize.toDp() }
+    val style = if (largeCompact) {
+        MaterialTheme.typography.body2.copy(fontSize = 15.sp)
+    } else {
+        MaterialTheme.typography.body2
+    }
+    val avatarSize = if (largeCompact) {
+        14.dp
+    } else {
+        with(LocalDensity.current) { style.fontSize.toDp() }
+    }
     Row(
         modifier = modifier
             .height(36.dp)
@@ -289,7 +298,7 @@ private fun ForumLabel(
         Text(
             text = title,
             style = style,
-            fontWeight = FontWeight.Medium,
+            fontWeight = if (largeCompact) FontWeight.Bold else FontWeight.Medium,
             color = ExtendedTheme.colors.text,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -305,11 +314,13 @@ private fun CompactForumItem(
     modifier: Modifier = Modifier,
     avatar: String? = null,
     showAvatar: Boolean = false,
+    largeCompact: Boolean = false,
 ) {
     ForumLabel(
         title = title,
         avatar = avatar,
         showAvatar = showAvatar,
+        largeCompact = largeCompact,
         modifier = modifier.debounceClickable(onClick = onClick),
     )
 }
@@ -342,6 +353,7 @@ private fun HistoryForumItem(
     onRemove: () -> Unit,
     modifier: Modifier = Modifier,
     showAvatar: Boolean = false,
+    largeCompact: Boolean = false,
 ) {
     val menuState = rememberMenuState()
     LongClickMenu(
@@ -376,6 +388,7 @@ private fun HistoryForumItem(
             title = history.title.removeSuffix("吧"),
             avatar = history.avatar,
             showAvatar = showAvatar,
+            largeCompact = largeCompact,
         )
     }
 }
@@ -833,6 +846,7 @@ fun HomePage(
                                                         history = forum,
                                                         modifier = itemModifier,
                                                         showAvatar = forumListLayout.isCompact,
+                                                        largeCompact = forumListLayout == ForumListLayout.Triple,
                                                         onClick = {
                                                             navigator.navigate(
                                                                 ForumPageDestination(forum.data)
@@ -940,6 +954,7 @@ fun HomePage(
                                             title = item.forumName.removeSuffix("吧"),
                                             avatar = item.avatar,
                                             showAvatar = true,
+                                            largeCompact = forumListLayout == ForumListLayout.Triple,
                                             modifier = itemModifier,
                                             onClick = {
                                                 navigator.navigate(
