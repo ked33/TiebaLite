@@ -435,9 +435,9 @@ fun ForumSearchPostPage(
                                         }
                                     },
                                     onItemUserClick = {
-                                        if(!it.userId.isNullOrEmpty())navigator.navigate(UserProfilePageDestination(
-                                            it.userId.toLong()
-                                        ))
+                                        it.userId.toLongOrNull()?.takeIf { uid -> uid > 0L }?.let { uid ->
+                                            navigator.navigate(UserProfilePageDestination(uid))
+                                        }
                                     },
                                     onItemForumClick = {
                                         navigator.navigate(

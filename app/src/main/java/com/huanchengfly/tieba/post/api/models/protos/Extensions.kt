@@ -218,6 +218,18 @@ private val PbContent.picUrl: String
 val List<PbContent>.plainText: String
     get() = renders.joinToString("\n") { it.toString() }
 
+internal fun PbContent.imageDimensions(): Pair<Int, Int> {
+    val dimensions = bsize.split(',', limit = 3)
+    val parsedWidth = dimensions.getOrNull(0)?.trim()?.toIntOrNull()?.takeIf { it > 0 }
+    val parsedHeight = dimensions.getOrNull(1)?.trim()?.toIntOrNull()?.takeIf { it > 0 }
+    return when {
+        dimensions.size == 2 && parsedWidth != null && parsedHeight != null ->
+            parsedWidth to parsedHeight
+        width > 0 && height > 0 -> width to height
+        else -> 1 to 1
+    }
+}
+
 @OptIn(ExperimentalTextApi::class)
 val List<PbContent>.renders: ImmutableList<PbContentRender>
     get() {
@@ -260,8 +272,7 @@ val List<PbContent>.renders: ImmutableList<PbContentRender>
                 }
 
                 3 -> {
-                    val width = it.bsize.split(",")[0].toInt()
-                    val height = it.bsize.split(",")[1].toInt()
+                    val (width, height) = it.imageDimensions()
                     renders.add(
                         PicContentRender(
                             picUrl = it.picUrl,
@@ -336,8 +347,7 @@ val List<PbContent>.renders: ImmutableList<PbContentRender>
                 }
 
                 20 -> {
-                    val width = it.bsize.split(",")[0].toInt()
-                    val height = it.bsize.split(",")[1].toInt()
+                    val (width, height) = it.imageDimensions()
                     renders.add(
                         PicContentRender(
                             picUrl = it.src,
