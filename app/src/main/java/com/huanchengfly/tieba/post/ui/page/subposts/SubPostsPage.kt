@@ -28,8 +28,10 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.OpenInBrowser
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -194,6 +196,19 @@ internal fun SubPostsContent(
         prop1 = SubPostsUiState::post,
         initial = null
     )
+    val loadAuthorIpLocation = remember(viewModel) { viewModel::getAuthorIpLocation }
+    val postAuthorIpLocation by rememberAuthorIpLocation(
+        author = post?.get { author },
+        loadAuthorIpLocation = loadAuthorIpLocation,
+    )
+    val postWithIpLocation = remember(post, postAuthorIpLocation) {
+        val ipLocation = postAuthorIpLocation
+        if (ipLocation == null) {
+            post
+        } else {
+            post?.getImmutable { copy(author = author?.copy(ip_address = ipLocation)) }
+        }
+    }
     val postContentRenders by viewModel.uiState.collectPartialAsState(
         prop1 = SubPostsUiState::postContentRenders,
         initial = persistentListOf()
@@ -433,7 +448,7 @@ internal fun SubPostsContent(
             ) {
                 MyLazyColumn(state = lazyListState) {
                     item(key = "Post$postId") {
-                        post?.let {
+                        postWithIpLocation?.let {
                             Column {
                                 PostCard(
                                     postHolder = it,
@@ -506,6 +521,7 @@ internal fun SubPostsContent(
                     ) { _, item ->
                         SubPostItem(
                             item = item,
+                            loadAuthorIpLocation = loadAuthorIpLocation,
                             canDelete = { it.author_id == account?.uid?.toLongOrNull() || it.author?.id == account?.uid?.toLongOrNull() || thread?.get { author?.id } ==  account?.uid?.toLongOrNull() },
                             threadAuthorId = thread?.get { author?.id },
                             onUserClick = {
@@ -559,6 +575,18 @@ internal fun SubPostsContent(
     }
 }
 
+@Composable
+private fun rememberAuthorIpLocation(
+    author: User?,
+    loadAuthorIpLocation: suspend (Long) -> String?,
+): State<String?> {
+    val authorId = author?.id ?: 0L
+    val ipLocation = author?.ip_address?.trim()?.takeIf { it.isNotEmpty() }
+    return produceState(initialValue = ipLocation, key1 = authorId, key2 = ipLocation) {
+        value = ipLocation ?: loadAuthorIpLocation(authorId)
+    }
+}
+
 private fun getDescText(
     time: Long?,
     ipAddress: String?
@@ -566,15 +594,16 @@ private fun getDescText(
     val texts = listOfNotNull(
         time?.let { DateTimeUtils.getRelativeTimeString(App.INSTANCE, it) },
         ipAddress?.takeIf { it.isNotBlank() }
-            ?.let { App.INSTANCE.getString(R.string.text_profile_ip_location, it) }
+            ?.let { App.INSTANCE.getString(R.string.text_ip_location, it) }
     )
     if (texts.isEmpty()) return ""
-    return texts.joinToString(" ")
+    return texts.joinToString(" · ")
 }
 
 @Composable
 private fun SubPostItem(
     item: SubPostItemData,
+    loadAuthorIpLocation: suspend (Long) -> String?,
     threadAuthorId: Long? = null,
     canDelete: (SubPostList) -> Boolean = { false },
     onUserClick: (User) -> Unit = {},
@@ -589,11 +618,10 @@ private fun SubPostItem(
     val account = LocalAccount.current
     val coroutineScope = rememberCoroutineScope()
     val author = remember(subPost) { subPost.get { author }?.wrapImmutable() }
-    val authorIpLocation = remember(subPost, author) {
-        author?.get { ip_address }?.takeIf { it.isNotBlank() }
-            ?: author?.get { ip }?.takeIf { it.isNotBlank() }
-            ?: subPost.get { location?.name }?.takeIf { it.isNotBlank() }
-    }
+    val authorIpLocation by rememberAuthorIpLocation(
+        author = author?.get(),
+        loadAuthorIpLocation = loadAuthorIpLocation,
+    )
     val hasAgreed = remember(subPost) {
         subPost.get { agree?.hasAgree == 1 }
     }

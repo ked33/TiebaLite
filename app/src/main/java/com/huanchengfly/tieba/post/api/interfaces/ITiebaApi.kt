@@ -1470,7 +1470,8 @@ interface ITiebaApi {
      * @param uid 用户 ID
      */
     fun userProfileFlow(
-        uid: Long
+        uid: Long,
+        includePosts: Boolean = true,
     ): Flow<ProfileResponse>
 
     /**

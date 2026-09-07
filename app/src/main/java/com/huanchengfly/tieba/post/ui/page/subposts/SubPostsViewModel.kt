@@ -2,6 +2,7 @@ package com.huanchengfly.tieba.post.ui.page.subposts
 
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
+import androidx.lifecycle.viewModelScope
 import com.huanchengfly.tieba.post.api.TiebaApi
 import com.huanchengfly.tieba.post.api.models.AgreeBean
 import com.huanchengfly.tieba.post.api.models.CommonResponse
@@ -31,20 +32,58 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.filterIsInstance
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapConcat
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import javax.inject.Inject
 
 @Stable
 @HiltViewModel
 class SubPostsViewModel @Inject constructor() :
     BaseViewModel<SubPostsUiIntent, SubPostsPartialChange, SubPostsUiState, SubPostsUiEvent>() {
+    private val authorIpLocationRequests = mutableMapOf<Long, Deferred<String?>>()
+    private val authorIpLocationSemaphore = Semaphore(3)
+
+    // The floor API omits IP locations. Share profile lookups across visible replies.
+    suspend fun getAuthorIpLocation(userId: Long): String? {
+        if (userId <= 0L) return null
+        val request = synchronized(authorIpLocationRequests) {
+            authorIpLocationRequests.getOrPut(userId) {
+                viewModelScope.async(Dispatchers.IO) {
+                    authorIpLocationSemaphore.withPermit {
+                        try {
+                            TiebaApi.getInstance()
+                                .userProfileFlow(userId, includePosts = false)
+                                .first()
+                                .data_?.user
+                                ?.takeIf { it.id == userId }
+                                ?.ip_address
+                                ?.trim()
+                                ?.takeIf { it.isNotEmpty() }
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (_: Exception) {
+                            null
+                        }
+                    }
+                }
+            }
+        }
+        return request.await()
+    }
+
     override fun createInitialState() = SubPostsUiState()
 
     override fun createPartialChangeProducer() = SubPostsPartialChangeProducer

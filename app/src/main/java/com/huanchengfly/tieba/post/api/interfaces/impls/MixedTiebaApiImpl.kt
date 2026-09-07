@@ -1312,7 +1312,7 @@ object MixedTiebaApiImpl : ITiebaApi {
             )
     }
 
-    override fun userProfileFlow(uid: Long): Flow<ProfileResponse> {
+    override fun userProfileFlow(uid: Long, includePosts: Boolean): Flow<ProfileResponse> {
         val selfUid = AccountUtil.getUid()?.toLongOrNull()
         val isSelf = selfUid == uid
         return RetrofitTiebaApi.OFFICIAL_PROTOBUF_TIEBA_V12_API.profileFlow(
@@ -1322,10 +1322,10 @@ object MixedTiebaApiImpl : ITiebaApi {
                         common = buildCommonRequest(clientVersion = ClientVersion.TIEBA_V12),
                         friend_uid = uid.takeIf { !isSelf },
                         friend_uid_portrait = "",
-                        has_plist = 1,
+                        has_plist = if (includePosts) 1 else 0,
                         is_from_usercenter = 1,
                         is_guest = if (isSelf) 0 else 1,
-                        need_post_count = 1,
+                        need_post_count = if (includePosts) 1 else 0,
                         page = 1,
                         pn = 1,
                         q_type = 0,
