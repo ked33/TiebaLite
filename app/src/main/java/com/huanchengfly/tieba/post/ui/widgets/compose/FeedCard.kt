@@ -852,7 +852,7 @@ private fun ThreadCompactAgreeBtn(
 }
 
 @Composable
-private fun ThreadCompactActions(
+internal fun ThreadCompactActions(
     replyNum: String,
     agreeNum: String,
     hasAgree: Boolean,

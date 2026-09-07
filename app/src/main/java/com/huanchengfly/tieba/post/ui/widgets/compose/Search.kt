@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -192,6 +193,7 @@ fun SearchThreadUserHeader(
     time: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    content: @Composable RowScope.() -> Unit = {},
 ) {
     UserHeader(
         avatar = {
@@ -208,16 +210,21 @@ fun SearchThreadUserHeader(
                     user.userName.orEmpty(),
                     user.showNickname,
                     color = LocalContentColor.current
-                )
+                ),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         },
         desc = {
             Text(
-                text = DateTimeUtils.getRelativeTimeString(LocalContext.current, time)
+                text = DateTimeUtils.getRelativeTimeString(LocalContext.current, time),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         },
         onClick = onClick,
-        modifier = modifier
+        modifier = modifier,
+        content = content,
     )
 }
 
@@ -240,7 +247,16 @@ fun SearchThreadItem(
                 user = item.user,
                 time = item.time,
                 onClick = { onUserClick(item.user) }
-            )
+            ) {
+                ThreadCompactActions(
+                    replyNum = item.postNum,
+                    agreeNum = item.likeNum,
+                    hasAgree = false,
+                    onReplyClick = {},
+                    onAgreeClick = {},
+                    modifier = Modifier.padding(end = 8.dp),
+                )
+            }
         },
         content = {
             ThreadContent(
@@ -291,28 +307,6 @@ fun SearchThreadItem(
                 ) {
                     onForumClick(item.forumInfo)
                 }
-            }
-        },
-        action = {
-            Row(modifier = Modifier.fillMaxWidth()) {
-                ThreadReplyBtn(
-                    replyNum = item.postNum,
-                    onClick = {},
-                    modifier = Modifier.weight(1f)
-                )
-
-                ThreadAgreeBtn(
-                    hasAgree = false,
-                    agreeNum = item.likeNum,
-                    onClick = {},
-                    modifier = Modifier.weight(1f)
-                )
-
-                ThreadShareBtn(
-                    shareNum = item.shareNum,
-                    onClick = {},
-                    modifier = Modifier.weight(1f)
-                )
             }
         },
         onClick = { onClick(item) },
