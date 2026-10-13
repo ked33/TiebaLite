@@ -63,6 +63,7 @@ import androidx.compose.material.icons.rounded.Face6
 import androidx.compose.material.icons.rounded.FaceRetouchingOff
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
+import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Report
 import androidx.compose.material.icons.rounded.RocketLaunch
@@ -140,10 +141,12 @@ import com.huanchengfly.tieba.post.ui.page.LocalNavigator
 import com.huanchengfly.tieba.post.ui.page.ProvideNavigator
 import com.huanchengfly.tieba.post.ui.page.destinations.CopyTextDialogPageDestination
 import com.huanchengfly.tieba.post.ui.page.destinations.ForumPageDestination
+import com.huanchengfly.tieba.post.ui.page.destinations.MainPageDestination
 import com.huanchengfly.tieba.post.ui.page.destinations.ReplyPageDestination
 import com.huanchengfly.tieba.post.ui.page.destinations.SubPostsSheetPageDestination
 import com.huanchengfly.tieba.post.ui.page.destinations.ThreadPageDestination
 import com.huanchengfly.tieba.post.ui.page.destinations.UserProfilePageDestination
+import com.huanchengfly.tieba.post.ui.widgets.compose.ActionItem
 import com.huanchengfly.tieba.post.ui.widgets.compose.Avatar
 import com.huanchengfly.tieba.post.ui.widgets.compose.BackNavigationIcon
 import com.huanchengfly.tieba.post.ui.widgets.compose.BlockTip
@@ -1291,6 +1294,12 @@ fun ThreadPage(
                                     forumName
                                 )
                             )
+                        },
+                        onHomeClick = {
+                            navigator.navigate(MainPageDestination) {
+                                popUpTo(MainPageDestination)
+                                launchSingleTop = true
+                            }
                         }
                     )
                 },
@@ -1870,6 +1879,7 @@ private fun TopBar(
     forum: ImmutableHolder<SimpleForum>?,
     onBack: () -> Unit,
     onForumClick: () -> Unit,
+    onHomeClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     TitleCentredToolbar(
@@ -1908,6 +1918,13 @@ private fun TopBar(
         },
         navigationIcon = {
             BackNavigationIcon(onBack)
+        },
+        actions = {
+            ActionItem(
+                icon = Icons.Rounded.Home,
+                contentDescription = stringResource(id = R.string.title_main),
+                onClick = onHomeClick
+            )
         },
         modifier = modifier
     )
