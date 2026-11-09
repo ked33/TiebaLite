@@ -21,7 +21,6 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.ui.PlayerView
-import com.huanchengfly.tieba.post.ui.widgets.compose.video.util.FlowDebouncer
 import com.huanchengfly.tieba.post.ui.widgets.compose.video.util.set
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -148,17 +147,11 @@ internal class DefaultVideoPlayerController(
             addListener(playerListener)
         }
 
-    /**
-     * Not so efficient way of showing preview in video slider.
-     */
+    // The second decoder/buffer exists only while the seek preview is visible.
     private var _previewExoPlayer: ExoPlayer? = null
-    private val previewExoPlayer: ExoPlayer
-        get() {
-            if (_previewExoPlayer == null) {
-                _previewExoPlayer = createPreviewExoPlayer()
-            }
-            return _previewExoPlayer!!
-        }
+    private var previewPlayerView: PlayerView? = null
+    private var previewPosition: Long? = null
+    private var previewSeekJob: Job? = null
 
     private fun createPreviewExoPlayer() = ExoPlayer.Builder(context)
         .build()
@@ -166,16 +159,8 @@ internal class DefaultVideoPlayerController(
             playWhenReady = false
         }
 
-    private val previewSeekDebouncer = FlowDebouncer<Long>(200L)
-
     init {
         exoPlayer.playWhenReady = initialState.isPlaying
-
-        coroutineScope.launch {
-            previewSeekDebouncer.collect { position ->
-                previewExoPlayer.seekTo(position)
-            }
-        }
     }
 
     fun initialize() {
@@ -315,34 +300,21 @@ internal class DefaultVideoPlayerController(
     }
 
     @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
-    private fun prepare() {
-        fun createVideoSource(): MediaSource {
-            val dataSourceFactory: DataSource.Factory = DefaultDataSource.Factory(context)
-
-            return when (val source = source) {
-                is VideoPlayerSource.Raw -> {
-                    ProgressiveMediaSource.Factory(dataSourceFactory)
-                        .createMediaSource(
-                            MediaItem.fromUri(
-                                RawResourceDataSource.buildRawResourceUri(
-                                    source.resId
-                                )
-                            )
-                        )
-                }
-
-                is VideoPlayerSource.Network -> {
-                    ProgressiveMediaSource.Factory(dataSourceFactory)
-                        .createMediaSource(MediaItem.fromUri(source.url))
-                }
-            }
+    private fun createVideoSource(): MediaSource {
+        val dataSourceFactory: DataSource.Factory = DefaultDataSource.Factory(context)
+        val mediaItem = when (val source = source) {
+            is VideoPlayerSource.Raw -> MediaItem.fromUri(
+                RawResourceDataSource.buildRawResourceUri(source.resId)
+            )
+            is VideoPlayerSource.Network -> MediaItem.fromUri(source.url)
         }
+        return ProgressiveMediaSource.Factory(dataSourceFactory).createMediaSource(mediaItem)
+    }
 
+    @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+    private fun prepare() {
         exoPlayer.setMediaSource(createVideoSource())
-        previewExoPlayer.setMediaSource(createVideoSource())
-
         exoPlayer.prepare()
-        previewExoPlayer.prepare()
     }
 
     fun playerViewAvailable(playerView: PlayerView) {
@@ -355,32 +327,62 @@ internal class DefaultVideoPlayerController(
         }
     }
 
+    @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
     fun previewPlayerViewAvailable(playerView: PlayerView) {
-        playerView.player = previewExoPlayer
+        if (released.get() || !this::source.isInitialized) return
+        previewPlayerView?.takeIf { it !== playerView }?.player = null
+        previewPlayerView = playerView
+        val previewPlayer = _previewExoPlayer ?: createPreviewExoPlayer().also {
+            _previewExoPlayer = it
+            it.setMediaSource(createVideoSource())
+            it.seekTo(previewPosition ?: _state.value.currentPosition)
+            it.prepare()
+        }
+        playerView.player = previewPlayer
+    }
+
+    fun previewPlayerViewReleased(playerView: PlayerView) {
+        if (previewPlayerView === playerView) releasePreview()
+    }
+
+    fun releasePreview() {
+        previewSeekJob?.cancel()
+        previewSeekJob = null
+        previewPlayerView?.player = null
+        previewPlayerView = null
+        _previewExoPlayer?.release()
+        _previewExoPlayer = null
+        previewPosition = null
     }
 
     fun previewSeekTo(position: Long) {
-        // position is very accurate. Thumbnail doesn't have to be.
-        // Roll to the nearest "even" integer.
-        val seconds = position.toInt() / 1000
-        val nearestEven = (seconds - seconds.rem(2)).toLong()
-        coroutineScope.launch {
-            previewSeekDebouncer.put(nearestEven * 1000)
+        // Preview thumbnails only need two-second precision.
+        val roundedPosition = (position / 2_000) * 2_000
+        previewPosition = roundedPosition
+        previewSeekJob?.cancel()
+        previewSeekJob = coroutineScope.launch {
+            delay(200)
+            // A drag may have ended while waiting; never recreate a released player.
+            _previewExoPlayer?.seekTo(roundedPosition)
         }
     }
 
     override fun reset() {
-        exoPlayer.stop()
-        previewExoPlayer.stop()
+        _exoPlayer?.stop()
+        releasePreview()
     }
 
     override fun release() {
         Log.i("VideoPlayerController", "$this is release. is released $released")
         if (released.compareAndSet(false, true)) {
-            exoPlayer.release()
-            previewExoPlayer.release()
+            updateDurationAndPositionJob?.cancel()
+            updateDurationAndPositionJob = null
+            autoHideControllerJob?.cancel()
+            autoHideControllerJob = null
+            releasePreview()
+            _exoPlayer?.removeListener(playerListener)
+            _exoPlayer?.release()
             _exoPlayer = null
-            _previewExoPlayer = null
         }
     }
 

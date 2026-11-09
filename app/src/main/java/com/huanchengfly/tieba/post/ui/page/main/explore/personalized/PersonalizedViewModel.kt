@@ -21,7 +21,7 @@ import com.huanchengfly.tieba.post.arch.wrapImmutable
 import com.huanchengfly.tieba.post.models.DislikeBean
 import com.huanchengfly.tieba.post.repository.PersonalizedRepository
 import com.huanchengfly.tieba.post.ui.models.ThreadItemData
-import com.huanchengfly.tieba.post.ui.models.distinctById
+import com.huanchengfly.tieba.post.ui.models.mergeDistinctById
 import com.huanchengfly.tieba.post.utils.appPreferences
 import com.huanchengfly.tieba.post.utils.FollowedForumsCache
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -290,7 +290,7 @@ sealed interface PersonalizedPartialChange : PartialChange<PersonalizedUiState> 
                 Start -> oldState.copy(isRefreshing = true)
                 is Success -> {
                     val oldSize = oldState.data.size
-                    val newData = (data + oldState.data).distinctById()
+                    val newData = data.mergeDistinctById(oldState.data)
                     oldState.copy(
                         isRefreshing = false,
                         currentPage = 1,
@@ -323,7 +323,7 @@ sealed interface PersonalizedPartialChange : PartialChange<PersonalizedUiState> 
                 is Success -> oldState.copy(
                     isLoadingMore = false,
                     currentPage = currentPage,
-                    data = (oldState.data + data).distinctById(),
+                    data = oldState.data.mergeDistinctById(data),
                 )
 
                 is Failure -> oldState.copy(

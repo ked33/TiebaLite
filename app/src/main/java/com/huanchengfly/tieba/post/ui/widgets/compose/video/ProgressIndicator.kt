@@ -36,7 +36,8 @@ fun ProgressIndicator(
                     modifier = Modifier
                         .height(48.dp)
                         .width(48.dp * videoSize.first / videoSize.second)
-                        .background(Color.DarkGray)
+                        .background(Color.DarkGray),
+                    onPlayerViewReleased = controller::previewPlayerViewReleased
                 ) {
                     controller.previewPlayerViewAvailable(it)
                 }

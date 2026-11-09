@@ -8,11 +8,9 @@ import android.content.Context
 import android.content.res.Configuration
 import android.content.res.Resources
 import android.graphics.Color
-import android.graphics.ImageDecoder
 import android.graphics.drawable.Drawable
 import android.os.Build
 import android.os.Process
-import android.webkit.WebSettings
 import android.webkit.WebView
 import androidx.annotation.Keep
 import androidx.annotation.RequiresApi
@@ -21,22 +19,15 @@ import androidx.compose.ui.graphics.toArgb
 import com.github.gzuliyujiang.oaid.DeviceID
 import com.github.panpf.sketch.Sketch
 import com.github.panpf.sketch.SketchFactory
-import com.github.panpf.sketch.datasource.AssetDataSource
-import com.github.panpf.sketch.datasource.BasedFileDataSource
-import com.github.panpf.sketch.datasource.ByteArrayDataSource
-import com.github.panpf.sketch.datasource.ContentDataSource
-import com.github.panpf.sketch.datasource.ResourceDataSource
-import com.github.panpf.sketch.decode.DrawableDecodeResult
-import com.github.panpf.sketch.decode.DrawableDecoder
 import com.github.panpf.sketch.decode.GifAnimatedDrawableDecoder
 import com.github.panpf.sketch.decode.GifMovieDrawableDecoder
 import com.github.panpf.sketch.decode.HeifAnimatedDrawableDecoder
 import com.github.panpf.sketch.decode.WebpAnimatedDrawableDecoder
-import com.github.panpf.sketch.fetch.FetchResult
 import com.github.panpf.sketch.http.OkHttpStack
 import com.github.panpf.sketch.request.PauseLoadWhenScrollingDrawableDecodeInterceptor
-import com.github.panpf.sketch.request.internal.RequestContext
 import com.huanchengfly.tieba.post.components.ClipBoardLinkDetector
+import com.huanchengfly.tieba.post.components.ImageMemoryManager
+import com.huanchengfly.tieba.post.components.SingleFrameSafeAnimatedDecoderFactory
 import com.huanchengfly.tieba.post.components.OAIDGetter
 
 import com.huanchengfly.tieba.post.ui.common.theme.compose.dynamicTonalPalette
@@ -50,11 +41,10 @@ import com.huanchengfly.tieba.post.utils.EmoticonManager
 import com.huanchengfly.tieba.post.utils.SharedPreferencesUtil
 import com.huanchengfly.tieba.post.utils.ThemeUtil
 import com.huanchengfly.tieba.post.utils.Util
+import com.huanchengfly.tieba.post.utils.WebViewUserAgent
 import com.huanchengfly.tieba.post.utils.appPreferences
-import com.huanchengfly.tieba.post.utils.applicationMetaData
 import com.huanchengfly.tieba.post.utils.packageInfo
 import dagger.hilt.android.HiltAndroidApp
-import java.nio.ByteBuffer
 import kotlin.concurrent.thread
 import kotlinx.coroutines.runBlocking
 
@@ -67,13 +57,14 @@ class App : Application(), SketchFactory {
     private fun setWebViewPath(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             val processName = getProcessName(context)
-            if (applicationContext.packageName != processName) { //判断不等于默认进程名称
-                WebView.setDataDirectorySuffix(processName!!)
+            if (processName != null && applicationContext.packageName != processName) {
+                WebView.setDataDirectorySuffix(processName)
             }
         }
     }
 
     private fun getProcessName(context: Context): String? {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) return Application.getProcessName()
         val manager = context.getSystemService(ACTIVITY_SERVICE) as ActivityManager
         for (processInfo in manager.runningAppProcesses) {
             if (processInfo.pid == Process.myPid()) {
@@ -86,16 +77,19 @@ class App : Application(), SketchFactory {
     override fun onCreate() {
         INSTANCE = this
         super.onCreate()
-        ClientUtils.init(this)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             setWebViewPath(this)
         }
-        AccountUtil.init(this)
         Config.init(this)
-        val isSelfBuild = applicationMetaData.getBoolean("is_self_build")
+        ClientUtils.init(this)
+        AccountUtil.init(this)
+        // Background sign-in still needs account/API initialization and notification colors.
+        ThemeUtils.init(ThemeDelegate)
+        if (getProcessName(this)?.let { it != packageName } == true) return
+
+        ImageMemoryManager.install(this)
         AppIconUtil.setIcon()
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
-        ThemeUtils.init(ThemeDelegate)
         registerActivityLifecycleCallbacks(ClipBoardLinkDetector)
         registerActivityLifecycleCallbacks(OAIDGetter)
         thread {
@@ -161,7 +155,6 @@ class App : Application(), SketchFactory {
         var oaid: String = ""
         var encodedOAID: String = ""
         var isTrackLimited: Boolean = false
-        var userAgent: String? = null
         var appFirstInstallTime: Long = 0L
         var appLastUpdateTime: Long = 0L
 
@@ -174,7 +167,7 @@ class App : Application(), SketchFactory {
                     statusCode = -200
                     isTrackLimited = false
                 }
-                userAgent = WebSettings.getDefaultUserAgent(context)
+                WebViewUserAgent.init(context)
                 appFirstInstallTime = context.packageInfo.firstInstallTime
                 appLastUpdateTime = context.packageInfo.lastUpdateTime
                 inited = true
@@ -773,89 +766,22 @@ class App : Application(), SketchFactory {
         }
     }
 
-    @SuppressLint("NewApi")
     override fun createSketch(): Sketch = Sketch.Builder(this).apply {
+        ImageMemoryManager.configure(this, this@App)
         httpStack(OkHttpStack.Builder().apply {
             userAgent(System.getProperty("http.agent"))
         }.build())
         components {
             addDrawableDecodeInterceptor(PauseLoadWhenScrollingDrawableDecodeInterceptor())
-
-            val gifAnimatedFactory = GifAnimatedDrawableDecoder.Factory()
-            val webpAnimatedFactory = WebpAnimatedDrawableDecoder.Factory()
-            val heifAnimatedFactory = HeifAnimatedDrawableDecoder.Factory()
-            //兼容单帧动图
-            fun wrapDecoder(factory: DrawableDecoder.Factory) = object : DrawableDecoder.Factory {
-                override fun create(
-                    sketch: Sketch,
-                    requestContext: RequestContext,
-                    fetchResult: FetchResult
-                ): DrawableDecoder? {
-                    val animatedMimeTypes = setOf("image/gif", "image/webp", "image/heif")
-                    if (fetchResult.mimeType !in animatedMimeTypes) return factory.create(
-                        sketch,
-                        requestContext,
-                        fetchResult
-                    )
-
-                    val dataSource = fetchResult.dataSource
-
-                    val isActuallyAnimated = try {
-                        val source = when (dataSource) {
-                            is AssetDataSource -> ImageDecoder.createSource(
-                                sketch.context.assets,
-                                dataSource.assetFileName
-                            )
-
-                            is ResourceDataSource -> ImageDecoder.createSource(
-                                dataSource.resources,
-                                dataSource.resId
-                            )
-
-                            is ContentDataSource -> ImageDecoder.createSource(
-                                sketch.context.contentResolver,
-                                dataSource.contentUri
-                            )
-
-                            is ByteArrayDataSource -> {
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                                    ImageDecoder.createSource(dataSource.data)
-                                } else {
-                                    ImageDecoder.createSource(ByteBuffer.wrap(dataSource.data))
-                                }
-                            }
-
-                            is BasedFileDataSource -> ImageDecoder.createSource(dataSource.getFile())
-
-                            else -> null
-                        }
-
-                        if (source != null) {
-                            var animated = false
-                            ImageDecoder.decodeDrawable(source) { _, info, _ ->
-                                animated = info.isAnimated
-                            }
-                            animated
-                        } else {
-                            false
-                        }
-                    } catch (e: Throwable) {
-                        false
-                    }
-
-                    if (!isActuallyAnimated) {
-                        return null
-                    }
-
-                    return factory.create(sketch, requestContext, fetchResult)
-                }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                addDrawableDecoder(SingleFrameSafeAnimatedDecoderFactory(GifAnimatedDrawableDecoder.Factory(), checkGifFrames = true))
+                addDrawableDecoder(SingleFrameSafeAnimatedDecoderFactory(WebpAnimatedDrawableDecoder.Factory()))
             }
-
-            addDrawableDecoder(wrapDecoder(gifAnimatedFactory))
-            addDrawableDecoder(wrapDecoder(webpAnimatedFactory))
-            addDrawableDecoder(wrapDecoder(heifAnimatedFactory))
-
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                addDrawableDecoder(SingleFrameSafeAnimatedDecoderFactory(HeifAnimatedDrawableDecoder.Factory()))
+            }
+            // Also handles one-frame GIFs and Android versions before ImageDecoder.
             addDrawableDecoder(GifMovieDrawableDecoder.Factory())
         }
-    }.build()
+    }.build().also(ImageMemoryManager::onSketchCreated)
 }

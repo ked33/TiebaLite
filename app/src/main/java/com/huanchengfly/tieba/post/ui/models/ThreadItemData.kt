@@ -5,6 +5,7 @@ import com.huanchengfly.tieba.post.App
 import com.huanchengfly.tieba.post.api.models.protos.ThreadInfo
 import com.huanchengfly.tieba.post.api.models.protos.personalized.ThreadPersonalized
 import com.huanchengfly.tieba.post.arch.ImmutableHolder
+import com.huanchengfly.tieba.post.arch.mergeDistinct
 import com.huanchengfly.tieba.post.utils.BlockManager.shouldBlock
 import com.huanchengfly.tieba.post.utils.appPreferences
 import kotlinx.collections.immutable.ImmutableList
@@ -24,4 +25,11 @@ fun List<ThreadItemData>.distinctById(): ImmutableList<ThreadItemData> {
             id
         }
     }.toImmutableList()
+}
+
+/** Merge without allocating a concatenated list; the first item for each ID wins. */
+fun List<ThreadItemData>.mergeDistinctById(
+    other: List<ThreadItemData>,
+): ImmutableList<ThreadItemData> {
+    return mergeDistinct(other) { it.thread.get { id } }
 }

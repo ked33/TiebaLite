@@ -1,8 +1,7 @@
 package com.huanchengfly.tieba.post.api
 
-import android.os.Build
-import com.huanchengfly.tieba.post.App
 import com.huanchengfly.tieba.post.App.ScreenInfo
+import com.huanchengfly.tieba.post.utils.WebViewUserAgent
 
 
 private val defaultUserAgent: String =
@@ -10,7 +9,7 @@ private val defaultUserAgent: String =
 
 fun getUserAgent(appendString: String? = null): String {
     val append = " ${appendString?.trim()}".takeIf { !appendString.isNullOrEmpty() }.orEmpty()
-    return "${App.Config.userAgent ?: defaultUserAgent}$append"
+    return "${WebViewUserAgent.current ?: defaultUserAgent}$append"
 }
 
 fun getCookie(vararg cookies: Pair<String, () -> String?>): String {

@@ -22,6 +22,7 @@ import com.huanchengfly.tieba.post.arch.wrapImmutable
 import com.huanchengfly.tieba.post.repository.FrsPageRepository
 import com.huanchengfly.tieba.post.ui.models.ThreadItemData
 import com.huanchengfly.tieba.post.ui.models.distinctById
+import com.huanchengfly.tieba.post.ui.models.mergeDistinctById
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
@@ -338,7 +339,7 @@ sealed interface ForumThreadListPartialChange : PartialChange<ForumThreadListUiS
                 Start -> oldState.copy(isLoadingMore = true)
                 is Success -> oldState.copy(
                     isLoadingMore = false,
-                    threadList = (oldState.threadList + threadList).distinctById(),
+                    threadList = oldState.threadList.mergeDistinctById(threadList),
                     threadListIds = threadListIds.toImmutableList(),
                     currentPage = currentPage,
                     hasMore = hasMore

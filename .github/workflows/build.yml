@@ -67,7 +67,7 @@ jobs:
 
       - name: Build release APK
         shell: bash
-        run: ./gradlew assembleRelease --stacktrace --warning-mode all --console=plain
+        run: ./gradlew testReleaseUnitTest assembleRelease --stacktrace --warning-mode all --console=plain
 
       - name: Verify arm64-v8a output and collect metadata
         id: apk

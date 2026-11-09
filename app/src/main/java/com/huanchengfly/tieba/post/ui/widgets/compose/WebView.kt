@@ -19,6 +19,7 @@ package com.huanchengfly.tieba.post.ui.widgets.compose
 import android.content.Context
 import android.graphics.Bitmap
 import android.os.Bundle
+import android.view.ViewGroup
 import android.view.ViewGroup.LayoutParams
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
@@ -29,6 +30,7 @@ import android.widget.FrameLayout
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
@@ -45,6 +47,10 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.huanchengfly.tieba.post.utils.WebViewUserAgent
 import com.huanchengfly.tieba.post.ui.widgets.compose.LoadingState.Finished
 import com.huanchengfly.tieba.post.ui.widgets.compose.LoadingState.Loading
 import kotlinx.coroutines.CoroutineScope
@@ -71,8 +77,8 @@ import kotlinx.coroutines.withContext
  * @param onCreated Called when the WebView is first created, this can be used to set additional
  * settings on the WebView. WebChromeClient and WebViewClient should not be set here as they will be
  * subsequently overwritten after this lambda is called.
- * @param onDispose Called when the WebView is destroyed. Provides a bundle which can be saved
- * if you need to save and restore state in this WebView.
+ * @param onDispose Called immediately before the WebView is destroyed. Navigation history is
+ * saved automatically; this callback must not retain or destroy the WebView.
  * @param client Provides access to WebViewClient via subclassing
  * @param chromeClient Provides access to WebChromeClient via subclassing
  * @param factory An optional WebView factory for using a custom subclass of WebView
@@ -143,8 +149,8 @@ fun WebView(
  * @param onCreated Called when the WebView is first created, this can be used to set additional
  * settings on the WebView. WebChromeClient and WebViewClient should not be set here as they will be
  * subsequently overwritten after this lambda is called.
- * @param onDispose Called when the WebView is destroyed. Provides a bundle which can be saved
- * if you need to save and restore state in this WebView.
+ * @param onDispose Called immediately before the WebView is destroyed. Navigation history is
+ * saved automatically; this callback must not retain or destroy the WebView.
  * @param client Provides access to WebViewClient via subclassing
  * @param chromeClient Provides access to WebChromeClient via subclassing
  * @param factory An optional WebView factory for using a custom subclass of WebView
@@ -163,6 +169,29 @@ fun WebView(
     factory: ((Context) -> WebView)? = null,
 ) {
     val webView = state.webView
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    DisposableEffect(webView, lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (webView == null || state.webView !== webView) return@LifecycleEventObserver
+            when (event) {
+                Lifecycle.Event.ON_START -> webView?.onResume()
+                Lifecycle.Event.ON_STOP -> webView?.onPause()
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        if (webView != null && state.webView === webView) {
+            if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
+                webView.onResume()
+            } else {
+                webView.onPause()
+            }
+        }
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 
     BackHandler(captureBackPresses && navigator.canGoBack) {
         webView?.goBack()
@@ -217,23 +246,50 @@ fun WebView(
     AndroidView(
         factory = { context ->
             (factory?.invoke(context) ?: WebView(context)).apply {
+                WebViewUserAgent.updateFrom(this)
                 onCreated(this)
 
                 this.layoutParams = layoutParams
 
-                state.viewState?.let {
-                    this.restoreState(it)
-                }
-
                 webChromeClient = chromeClient
                 webViewClient = client
+                val restored = state.viewState?.let { restoreState(it) } != null
+                state.viewState = null
+                if (!restored && state.content is WebContent.NavigatorOnly) {
+                    // A failed history restore must not leave a previously loaded page blank.
+                    state.lastLoadedUrl?.let { loadUrl(it) }
+                }
             }.also { state.webView = it }
         },
         modifier = modifier,
-        onRelease = {
-            onDispose(it)
+        onRelease = { view ->
+            try {
+                if (state.webView === view) {
+                    // Preserve navigation history before releasing the native browser resources.
+                    state.viewState = view.saveNavigationState()
+                }
+                onDispose(view)
+            } finally {
+                if (state.webView === view) {
+                    state.webView = null
+                    state.pageIcon = null
+                    state.errorsForCurrentRequest.clear()
+                }
+                view.stopLoading()
+                view.onPause()
+                view.webChromeClient = null
+                view.webViewClient = WebViewClient()
+                (view.parent as? ViewGroup)?.removeView(view)
+                view.removeAllViews()
+                view.destroy()
+            }
         }
     )
+}
+
+private fun WebView.saveNavigationState(): Bundle? {
+    val bundle = Bundle()
+    return bundle.takeIf { saveState(it) != null }
 }
 
 /**
@@ -740,7 +796,7 @@ val WebStateSaver: Saver<WebViewState, Any> = run {
 
     mapSaver(
         save = {
-            val viewState = Bundle().apply { it.webView?.saveState(this) }
+            val viewState = it.webView?.saveNavigationState() ?: it.viewState
             mapOf(
                 pageTitleKey to it.pageTitle,
                 lastLoadedUrlKey to it.lastLoadedUrl,

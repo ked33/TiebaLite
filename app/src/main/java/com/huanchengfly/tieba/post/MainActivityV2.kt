@@ -160,6 +160,7 @@ fun rememberBottomSheetNavigator(
 class MainActivityV2 : BaseComposeActivity() {
     private val handler = Handler(Looper.getMainLooper())
     private val newMessageReceiver: BroadcastReceiver = NewMessageReceiver()
+    private var isNewMessageReceiverRegistered = false
 
     private val notificationCountFlow: MutableSharedFlow<Int> =
         MutableSharedFlow(replay = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
@@ -303,23 +304,44 @@ class MainActivityV2 : BaseComposeActivity() {
     override fun onStart() {
         super.onStart()
         runCatching {
-            ContextCompat.registerReceiver(
-                this,
-                newMessageReceiver,
-                newIntentFilter(NotifyJobService.ACTION_NEW_MESSAGE),
-                ContextCompat.RECEIVER_NOT_EXPORTED
-            )
-            startService(Intent(this, NotifyJobService::class.java))
-            val builder = JobInfo.Builder(
-                JobServiceUtil.getJobId(this),
-                ComponentName(this, NotifyJobService::class.java)
-            )
-                .setPersisted(true)
-                .setPeriodic(30 * 60 * 1000L)
-                .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
-            val jobScheduler = getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler
-            jobScheduler.schedule(builder.build())
+            if (!isNewMessageReceiverRegistered) {
+                ContextCompat.registerReceiver(
+                    this,
+                    newMessageReceiver,
+                    newIntentFilter(NotifyJobService.ACTION_NEW_MESSAGE),
+                    ContextCompat.RECEIVER_NOT_EXPORTED
+                )
+                isNewMessageReceiverRegistered = true
+            }
         }
+        runCatching {
+            val jobScheduler = getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler
+            val jobId = JobServiceUtil.getJobId(this)
+            val service = ComponentName(this, NotifyJobService::class.java)
+            val intervalMillis = 30 * 60 * 1000L
+            val pendingJob = jobScheduler.allPendingJobs.firstOrNull { it.id == jobId }
+            // Rescheduling the same periodic job would reset its pending execution window.
+            if (pendingJob == null || pendingJob.service != service || !pendingJob.isPeriodic ||
+                !pendingJob.isPersisted || pendingJob.intervalMillis != intervalMillis ||
+                pendingJob.networkType != JobInfo.NETWORK_TYPE_ANY
+            ) {
+                jobScheduler.schedule(
+                    JobInfo.Builder(jobId, service)
+                        .setPersisted(true)
+                        .setPeriodic(intervalMillis)
+                        .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
+                        .build()
+                )
+            }
+        }
+    }
+
+    override fun onDestroy() {
+        if (isNewMessageReceiverRegistered) {
+            unregisterReceiver(newMessageReceiver)
+            isNewMessageReceiverRegistered = false
+        }
+        super.onDestroy()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {

@@ -32,6 +32,7 @@ import com.huanchengfly.tieba.post.arch.PartialChangeProducer
 import com.huanchengfly.tieba.post.arch.UiEvent
 import com.huanchengfly.tieba.post.arch.UiIntent
 import com.huanchengfly.tieba.post.arch.UiState
+import com.huanchengfly.tieba.post.arch.appendNotInOriginal
 import com.huanchengfly.tieba.post.arch.wrapImmutable
 import com.huanchengfly.tieba.post.removeAt
 import com.huanchengfly.tieba.post.repository.EmptyDataException
@@ -803,13 +804,10 @@ sealed interface ThreadPartialChange : PartialChange<ThreadUiState> {
         override fun reduce(oldState: ThreadUiState): ThreadUiState = when (this) {
             is Start -> oldState.copy(isLoadingMore = true)
             is Success -> {
-                val uniqueData = data.filterNot { item ->
-                    oldState.data.any { it.post.get { id } == item.post.get { id } }
-                }
                 oldState.copy(
                     isLoadingMore = false,
                     author = wrapImmutable(author),
-                    data = (oldState.data + uniqueData).toImmutableList(),
+                    data = oldState.data.appendNotInOriginal(data) { it.post.get { id } },
                     threadInfo = threadInfo.wrapImmutable(),
                     currentPageMax = currentPage,
                     totalPage = totalPage,
@@ -877,13 +875,10 @@ sealed interface ThreadPartialChange : PartialChange<ThreadUiState> {
         override fun reduce(oldState: ThreadUiState): ThreadUiState = when (this) {
             Start -> oldState.copy(isLoadingMore = true)
             is Success -> {
-                val uniqueData = data.filterNot { item ->
-                    oldState.data.any { it.post.get { id } == item.post.get { id } }
-                }
                 oldState.copy(
                     isLoadingMore = false,
                     author = wrapImmutable(author),
-                    data = (oldState.data + uniqueData).toImmutableList(),
+                    data = oldState.data.appendNotInOriginal(data) { it.post.get { id } },
                     threadInfo = threadInfo.wrapImmutable(),
                     currentPageMax = currentPage,
                     totalPage = totalPage,
