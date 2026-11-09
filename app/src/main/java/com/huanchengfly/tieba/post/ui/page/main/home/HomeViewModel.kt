@@ -28,13 +28,13 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.flatMapConcat
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.onStart
-import kotlinx.coroutines.flow.zip
 
 @Stable
 class HomeViewModel : BaseViewModel<HomeUiIntent, HomePartialChange, HomeUiState, HomeUiEvent>() {
@@ -58,8 +58,11 @@ class HomeViewModel : BaseViewModel<HomeUiIntent, HomePartialChange, HomeUiState
             return merge(
                 intentFlow.filterIsInstance<HomeUiIntent.Refresh>()
                     .flatMapConcat { produceRefreshPartialChangeFlow() },
+                // Observe Room independently of the one-shot network refresh. Repeated refresh
+                // intents replace this observer instead of queuing behind an endless flow.
                 intentFlow.filterIsInstance<HomeUiIntent.RefreshHistory>()
-                    .flatMapConcat { produceRefreshHistoryPartialChangeFlow() },
+                    .onStart { emit(HomeUiIntent.RefreshHistory) }
+                    .flatMapLatest { produceRefreshHistoryPartialChangeFlow() },
                 intentFlow.filterIsInstance<HomeUiIntent.TopForums.Delete>()
                     .flatMapConcat { it.toPartialChangeFlow() },
                 intentFlow.filterIsInstance<HomeUiIntent.TopForums.Add>()
@@ -77,9 +80,7 @@ class HomeViewModel : BaseViewModel<HomeUiIntent, HomePartialChange, HomeUiState
 
         @Suppress("USELESS_CAST")
         private fun produceRefreshPartialChangeFlow(): Flow<HomePartialChange.Refresh> =
-            HistoryUtil.getFlow(HistoryUtil.TYPE_FORUM, 0).zip(
-                TiebaApi.getInstance().allForumGuideFlow()
-            ) { historyForums, forumGuideBean ->
+            TiebaApi.getInstance().allForumGuideFlow().map { forumGuideBean ->
                 val allLikeForums = forumGuideBean.likeForum
 
                 // 转换 UI 实体
@@ -102,7 +103,6 @@ class HomeViewModel : BaseViewModel<HomeUiIntent, HomePartialChange, HomeUiState
                 HomePartialChange.Refresh.Success(
                     forums,
                     topForums,
-                    historyForums
                 ) as HomePartialChange.Refresh
             }
                 .onStart { emit(HomePartialChange.Refresh.Start) }
@@ -212,7 +212,6 @@ sealed interface HomePartialChange : PartialChange<HomeUiState> {
                     hasLoaded = true,
                     forums = forums.toImmutableList(),
                     topForums = topForums.toImmutableList(),
-                    historyForums = historyForums.toImmutableList(),
                     error = null
                 )
 
@@ -225,7 +224,6 @@ sealed interface HomePartialChange : PartialChange<HomeUiState> {
         data class Success(
             val forums: List<HomeUiState.Forum>,
             val topForums: List<HomeUiState.Forum>,
-            val historyForums: List<History>,
         ) : Refresh()
 
         data class Failure(
