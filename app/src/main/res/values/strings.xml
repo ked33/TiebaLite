@@ -408,6 +408,8 @@
     <string name="title_hot">热榜</string>
     <string name="tip_more_topic">更多话题</string>
     <string name="hot_thread_rank_rule">(按内容热度排序，每小时更新一次)</string>
+    <string name="hot_thread_show_leading">显示前 %1$d 条</string>
+    <string name="hot_thread_collapse_leading">折叠前 %1$d 条</string>
     <string name="tab_all_hot_thread">总榜</string>
     <string name="hot_num">热度 %s</string>
     <string name="settings_app_icon">应用图标</string>

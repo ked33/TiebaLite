@@ -6,18 +6,19 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentSize
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.ContentAlpha
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.Icon
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
+import androidx.compose.material.TextButton
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.KeyboardArrowRight
 import androidx.compose.material.pullrefresh.PullRefreshIndicator
@@ -25,6 +26,9 @@ import androidx.compose.material.pullrefresh.pullRefresh
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -108,6 +112,10 @@ fun HotPage(
         prop1 = HotUiState::isLoadingThreadList,
         initial = false
     )
+    var leadingThreadsExpanded by rememberSaveable { mutableStateOf(false) }
+    val isOverallRanking = currentTabCode == "all"
+    val leadingThreadCount = minOf(4, threadList.size)
+    val firstThreadIndex = if (isOverallRanking && !leadingThreadsExpanded) leadingThreadCount else 0
     val pullRefreshState = rememberPullRefreshState(
         refreshing = isLoading,
         onRefresh = { viewModel.send(HotUiIntent.Load) })
@@ -279,21 +287,51 @@ fun HotPage(
                             .padding(bottom = 8.dp)
                             .padding(horizontal = 16.dp)
                     ) {
-                        Text(
-                            text = stringResource(id = R.string.hot_thread_rank_rule),
-                            color = ExtendedTheme.colors.textSecondary,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Normal,
-                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Text(
+                                text = stringResource(id = R.string.hot_thread_rank_rule),
+                                color = ExtendedTheme.colors.textSecondary,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Normal,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f),
+                            )
+                            if (isOverallRanking) {
+                                TextButton(
+                                    onClick = { leadingThreadsExpanded = !leadingThreadsExpanded },
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                                ) {
+                                    Text(
+                                        text = stringResource(
+                                            id = if (leadingThreadsExpanded) R.string.hot_thread_collapse_leading
+                                            else R.string.hot_thread_show_leading,
+                                            leadingThreadCount,
+                                        ),
+                                        color = ExtendedTheme.colors.primary,
+                                        fontSize = 12.sp,
+                                        maxLines = 1,
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
                 if (isLoadingThreadList) {
                     items(10) { ThreadListItemPlaceholder() }
                 } else {
-                    itemsIndexed(
-                        items = threadList,
-                        key = { _, item -> "Thread_${item.get { threadId }}" }
-                    ) { index, item ->
+                    items(
+                        count = threadList.size - firstThreadIndex,
+                        key = { visibleIndex ->
+                            "Thread_${threadList[visibleIndex + firstThreadIndex].get { threadId }}"
+                        }
+                    ) { visibleIndex ->
+                        val index = visibleIndex + firstThreadIndex
+                        val item = threadList[index]
                         Container {
                             FeedCard(
                                 item = item,
